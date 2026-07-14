@@ -11,8 +11,6 @@
 
 Ein moderner, responsiver Darts-Scorer für das lokale Netzwerk – gehostet auf einem Raspberry Pi. Handys dienen als Eingabegeräte (Numpad), Laptops/Monitore als Anzeigetafel. Mit Einzel- und Doppel-/Team-Spielen (501/301/101), Bots (Easy/Medium/Hard), Turnier-Modus, Live-Sync mehrerer Geräte, Statistik-/Analyse-Bereich, Achievements und drei Themes. Vollständig zweisprachig (DE/EN) und offline-fähig.
 
-> Privates Hobbyprojekt – nicht mit einem Arbeitgeber affiliiert.
-
 ## Screenshots
 
 <!-- Screenshots unter docs/screenshots/ ablegen (siehe docs/screenshots/README.md). -->
