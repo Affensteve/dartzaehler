@@ -1,0 +1,22 @@
+[Unit]
+Description=DartZähler – Darts-Scorer (Node.js + Express)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Benutzer/Pfad ggf. anpassen (Standard: Raspberry Pi OS "pi", Projekt unter /home/pi/dartzaehler)
+User=pi
+WorkingDirectory=/home/pi/dartzaehler/backend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=0.0.0.0
+Environment=DB_PATH=./data/dartzaehler.db
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+# Datenbank-Verzeichnis muss beschreibbar sein
+StateDirectory=dartzaehler
+
+[Install]
+WantedBy=multi-user.target

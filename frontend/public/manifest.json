@@ -1,0 +1,17 @@
+{
+  "name": "DartZähler",
+  "short_name": "DartZähler",
+  "description": "Darts-Scorer für das lokale Netzwerk",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F1117",
+  "theme_color": "#52B788",
+  "icons": [
+    {
+      "src": "/dart.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

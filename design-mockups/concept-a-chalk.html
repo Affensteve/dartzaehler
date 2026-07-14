@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Konzept A — Kreide &amp; Oche</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#161F19; --paper:#1C271F; --panel:#233024; --panel-2:#283626;
+    --text:#F1EFE4; --text-sec:#B6AF9C;
+    --accent:#2E9E4F; --accent-dark:#1F7D3C;
+    --double:#F4A62A; --triple:#EF6C33; --undo:#E4032B;
+    --rule: rgba(241,239,228,.34); --divider: rgba(241,239,228,.13);
+    --radius: 10px;
+    --display: 'Kalam', cursive; --body: 'Archivo', sans-serif; --mono: 'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text); font-family:var(--body);
+    background-image:
+      radial-gradient(circle at 20% 8%, rgba(46,158,79,.10) 0%, transparent 40%),
+      repeating-radial-gradient(circle at 50% 50%, rgba(241,239,228,.025) 0px, transparent 2px, transparent 4px);
+  }
+  .frame{max-width:1160px; margin:0 auto; padding:0 0 64px;}
+  .eyebrow{
+    font-family:var(--display); font-size:20px; color:var(--accent);
+    transform:rotate(-1deg); display:inline-block; margin:0 0 6px 4px;
+  }
+  h2.section-title{
+    font-family:var(--body); font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+    font-size:13px; color:var(--text-sec); margin:0 0 14px; padding-top:40px;
+  }
+  /* Topbar */
+  .topbar{
+    display:flex; align-items:center; gap:14px; padding:16px 20px;
+    background:linear-gradient(180deg, var(--accent-dark), var(--accent));
+    border-bottom:3px solid rgba(0,0,0,.25);
+  }
+  .topbar .back{width:22px;height:22px;color:#0f1c13;}
+  .topbar h1{
+    font-family:var(--display); font-size:28px; margin:0; color:#0f1c13; flex:1;
+    transform:rotate(-0.6deg);
+  }
+  .theme-strip{display:flex; gap:6px; align-items:center; background:rgba(0,0,0,.18); border-radius:20px; padding:4px 8px;}
+  .swatch{width:14px;height:14px;border-radius:50%; border:2px solid rgba(255,255,255,.6);}
+  .content{padding:24px 20px 0;}
+  /* chalk panel */
+  .panel{
+    background:var(--panel); border:2px solid var(--rule); border-radius:var(--radius);
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.15);
+    padding:18px;
+  }
+  .panel + .panel{margin-top:14px;}
+  /* Home grid */
+  .home-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+  .tile{
+    background:var(--panel); border:2px solid var(--rule); border-radius:var(--radius);
+    padding:20px 14px; text-align:center; box-shadow: inset 0 -6px 0 rgba(0,0,0,.15);
+  }
+  .tile svg{width:30px;height:30px;color:var(--accent); margin-bottom:8px;}
+  .tile span{display:block; font-family:var(--display); font-size:19px; transform:rotate(-0.8deg);}
+  /* Game section */
+  .game-row{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .player-card{
+    background:var(--panel); border:2px solid var(--rule); border-radius:var(--radius); padding:16px;
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.15); position:relative;
+  }
+  .player-card.active{border-color:var(--accent);}
+  .player-name{font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-sec);}
+  .player-name b{color:var(--text);}
+  .score-big{
+    font-family:var(--display); font-size:72px; line-height:1; color:var(--text);
+    margin:6px 0 2px; transform:rotate(-1deg);
+  }
+  .score-sub{font-family:var(--mono); font-size:13px; color:var(--text-sec);}
+  .dart-tally{display:flex; gap:10px; margin-top:10px;}
+  .tally-mark{
+    font-family:var(--display); font-size:26px; color:var(--accent);
+    background:rgba(46,158,79,.14); border:1px solid var(--rule); border-radius:6px;
+    width:44px; height:40px; display:flex; align-items:center; justify-content:center;
+  }
+  .pips{display:flex; gap:6px; margin-top:12px;}
+  .pip{width:12px;height:12px;border-radius:50%; background:var(--rule);}
+  .pip.won{background:var(--accent);}
+  .numpad-row{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
+  .key{
+    font-family:var(--mono); font-weight:700; background:var(--panel-2); border:1px solid var(--rule);
+    border-radius:8px; padding:10px 0; width:52px; text-align:center; color:var(--text);
+  }
+  .key.mod{background:rgba(244,166,42,.18); color:var(--double); border-color:rgba(244,166,42,.4);}
+  /* Setup */
+  .setup-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .field-label{font-family:var(--body); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-sec); margin-bottom:6px;}
+  .toggle-row{display:flex; border:1px solid var(--rule); border-radius:8px; overflow:hidden;}
+  .toggle-row button{flex:1; background:var(--panel-2); color:var(--text); border:none; border-right:1px solid var(--rule); padding:9px 0; font-family:var(--body); font-weight:700; font-size:13px;}
+  .toggle-row button:last-child{border-right:none;}
+  .toggle-row button.on{background:var(--accent); color:#0f1c13;}
+  /* Table */
+  table{width:100%; border-collapse:collapse; font-family:var(--body); font-size:14px;}
+  thead th{
+    text-align:left; text-transform:uppercase; font-size:11px; letter-spacing:.05em; color:var(--text-sec);
+    border-bottom:2px solid var(--rule); padding:8px 6px; font-weight:800;
+  }
+  tbody td{padding:10px 6px; border-bottom:1px solid var(--divider);}
+  tbody tr:first-child td{font-weight:800; color:var(--accent);}
+  .chip{display:inline-block; background:var(--panel-2); border:1px solid var(--rule); border-radius:20px; padding:2px 10px; font-size:12px; font-weight:700;}
+  /* Stats */
+  .stat-tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px;}
+  .stat-tile{background:var(--panel); border:2px solid var(--rule); border-radius:var(--radius); padding:16px; text-align:center;}
+  .stat-tile .num{font-family:var(--display); font-size:34px; color:var(--accent); transform:rotate(-1deg);}
+  .stat-tile .lbl{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-sec);}
+  /* Lists */
+  .list-row{display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--divider);}
+  .avatar{width:34px;height:34px;border-radius:50%; background:var(--accent-dark); display:flex; align-items:center; justify-content:center; font-weight:800; font-family:var(--display); color:#0f1c13;}
+  .list-row .name{flex:1; font-weight:700;}
+  .add-form{display:flex; gap:12px; margin-top:14px;}
+  .form-field{flex:1;}
+  .form-field input{
+    width:100%; background:var(--panel-2); border:1px solid var(--rule); border-radius:8px; color:var(--text);
+    padding:10px 12px; font-family:var(--body); font-size:14px;
+  }
+  /* Buttons/chips/dialog */
+  .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .btn{font-family:var(--body); font-weight:700; border-radius:8px; padding:10px 18px; font-size:14px; border:2px solid transparent; cursor:default;}
+  .btn.contained{background:var(--accent); color:#0f1c13;}
+  .btn.outlined{background:var(--panel-2); border-color:var(--accent); color:var(--accent);}
+  .btn.text{background:transparent; color:var(--text-sec);}
+  .dialog{
+    background:var(--panel); border:2px solid var(--rule); border-radius:14px; padding:18px; width:280px;
+    box-shadow: inset 0 -6px 0 rgba(0,0,0,.15);
+  }
+  .dialog h4{font-family:var(--display); margin:0 0 8px; font-size:22px; transform:rotate(-1deg);}
+  footer.legend{padding:20px; display:flex; gap:18px; align-items:center; color:var(--text-sec); font-size:12px;}
+  footer.legend .dot{width:12px;height:12px;border-radius:50%; display:inline-block; margin-right:6px; vertical-align:-1px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <svg class="back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+  <h1>DartZähler</h1>
+  <div class="theme-strip">
+    <span class="swatch" style="background:#2E9E4F"></span>
+    <span class="swatch" style="background:#E0356F"></span>
+  </div>
+</div>
+
+<div class="frame content">
+  <span class="eyebrow">Konzept A — Kreide &amp; Oche</span>
+
+  <h2 class="section-title">Start · Home</h2>
+  <div class="home-grid">
+    <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg><span>Neues Spiel</span></div>
+    <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M6 4h12v3a6 6 0 01-12 0V4z"/><path d="M6 6H3v2a3 3 0 003 3M18 6h3v2a3 3 0 01-3 3"/></svg><span>Turnier</span></div>
+    <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19l6-6 4 4 6-8"/></svg><span>Training</span></div>
+    <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>Spieler</span></div>
+    <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l1.5 5L19 3l-2 6 5 1-5 3 3 5-6-2-1 6-2-5-4 4v-6l-6 1 4-5-4-4 6 1z"/></svg><span>Pfeile</span></div>
+    <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M11 20V4M18 20v-7"/></svg><span>Statistik</span></div>
+  </div>
+
+  <h2 class="section-title">Spiel · Scoreboard</h2>
+  <div class="game-row">
+    <div class="player-card active">
+      <div class="player-name">Am Zug — <b>Steffen</b></div>
+      <div class="score-big">341</div>
+      <div class="score-sub">Ø 58.3 · Leg 2 · Satz 1</div>
+      <div class="dart-tally">
+        <div class="tally-mark">20</div>
+        <div class="tally-mark">T5</div>
+        <div class="tally-mark">—</div>
+      </div>
+      <div class="pips"><span class="pip won"></span><span class="pip"></span><span class="pip"></span></div>
+    </div>
+    <div class="player-card">
+      <div class="player-name">Jana</div>
+      <div class="score-big" style="color:var(--text-sec)">418</div>
+      <div class="score-sub">Ø 51.1 · Leg 2 · Satz 1</div>
+      <div class="dart-tally">
+        <div class="tally-mark" style="color:var(--text-sec);background:transparent">–</div>
+        <div class="tally-mark" style="color:var(--text-sec);background:transparent">–</div>
+        <div class="tally-mark" style="color:var(--text-sec);background:transparent">–</div>
+      </div>
+      <div class="pips"><span class="pip won"></span><span class="pip"></span><span class="pip"></span></div>
+    </div>
+  </div>
+  <div class="numpad-row">
+    <div class="key">1</div><div class="key">2</div><div class="key">3</div><div class="key">4</div><div class="key">5</div>
+    <div class="key mod">D</div><div class="key mod">T</div>
+  </div>
+
+  <h2 class="section-title">Neues Spiel · Konfiguration</h2>
+  <div class="panel">
+    <div class="setup-grid">
+      <div>
+        <div class="field-label">Punkte</div>
+        <div class="toggle-row"><button class="on">501</button><button>301</button><button>101</button></div>
+      </div>
+      <div>
+        <div class="field-label">Check-In</div>
+        <div class="toggle-row"><button class="on">Straight</button><button>Double</button></div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Turnier · Tabelle</h2>
+  <div class="panel">
+    <span class="chip">Gruppe A</span>
+    <table style="margin-top:12px">
+      <thead><tr><th>Platz</th><th>Spieler</th><th>Siege</th><th>Legs</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Steffen</td><td>3</td><td>7</td></tr>
+        <tr><td>2</td><td>Jana</td><td>2</td><td>5</td></tr>
+        <tr><td>3</td><td>Bot (mittel)</td><td>1</td><td>3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="section-title">Statistik · Filter</h2>
+  <div class="panel">
+    <div class="row" style="margin-bottom:10px">
+      <div class="toggle-row" style="width:auto"><button class="on">Spiel &amp; Turnier</button><button>Training</button></div>
+      <div class="toggle-row" style="width:auto"><button>Heute</button><button class="on">7 Tage</button><button>30 Tage</button><button>Ganze Zeit</button></div>
+    </div>
+    <div class="stat-tiles">
+      <div class="stat-tile"><div class="num">58.3</div><div class="lbl">Average</div></div>
+      <div class="stat-tile"><div class="num">41%</div><div class="lbl">Checkout</div></div>
+      <div class="stat-tile"><div class="num">6</div><div class="lbl">180er</div></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Spieler &amp; Pfeile · Verwaltung</h2>
+  <div class="panel">
+    <div class="list-row"><div class="avatar">S</div><div class="name">Steffen</div><span class="chip">Mensch</span></div>
+    <div class="list-row"><div class="avatar">J</div><div class="name">Jana</div><span class="chip">Mensch</span></div>
+    <div class="list-row"><div class="avatar">B</div><div class="name">Bot · mittel</div><span class="chip">Bot</span></div>
+    <div class="add-form">
+      <div class="form-field"><div class="field-label">Name</div><input placeholder="z. B. Target Carrera"/></div>
+      <div class="form-field" style="flex:0 0 120px"><div class="field-label">Gewicht (g)</div><input placeholder="23"/></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Komponenten</h2>
+  <div class="panel row" style="justify-content:space-between; align-items:flex-start; flex-wrap:wrap">
+    <div class="row" style="flex-direction:column; align-items:flex-start; gap:14px">
+      <div class="row"><button class="btn contained">Spiel starten</button><button class="btn outlined">Abbrechen</button><button class="btn text">Details</button></div>
+      <div class="row"><span class="chip">180</span><span class="chip">Checkout</span><span class="chip">Bust</span></div>
+    </div>
+    <div class="dialog">
+      <h4>Leg gewonnen!</h4>
+      <p style="margin:0 0 14px; color:var(--text-sec); font-size:13px">Steffen checkt mit T20 · T20 · D20 aus.</p>
+      <button class="btn contained" style="width:100%">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<footer class="legend">
+  Themes bleiben erhalten:
+  <span><span class="dot" style="background:#1E8A46"></span>Standard hell</span>
+  <span><span class="dot" style="background:#34B76B"></span>Standard dunkel</span>
+  <span><span class="dot" style="background:#E0356F"></span>Girlie hell</span>
+  <span><span class="dot" style="background:#FF6FA5"></span>Girlie dunkel</span>
+</footer>
+</body>
+</html>

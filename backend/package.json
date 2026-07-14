@@ -1,0 +1,22 @@
+{
+  "name": "dartzaehler-backend",
+  "version": "1.0.0",
+  "description": "DartZähler Backend – Express REST API + SQLite",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dartzaehler": "file:..",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
