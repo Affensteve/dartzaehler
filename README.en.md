@@ -11,8 +11,6 @@
 
 A modern, responsive darts scorer for your local network – hosted on a Raspberry Pi. Phones act as input devices (numpad), laptops/monitors as the scoreboard. Supports singles and doubles/team games (501/301/101), bots (Easy/Medium/Hard), a tournament mode, live sync across multiple devices, a stats & analysis section, achievements and three themes. Fully bilingual (German/English) and offline-capable.
 
-> A personal hobby project – not affiliated with any employer.
-
 ## Screenshots
 
 <!-- Put screenshots under docs/screenshots/ (see docs/screenshots/README.md). -->
