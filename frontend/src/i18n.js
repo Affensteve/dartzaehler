@@ -146,6 +146,7 @@ const DICT = {
     'ach.cat.Meilensteine': 'Meilensteine',
     'ach.cat.Training': 'Training',
     'ach.cat.Kurios': 'Kurios',
+    'ach.cat.Team': 'Team/Doppel',
 
     // Statistik
     'stats.title': 'Statistik',
@@ -331,6 +332,7 @@ const DICT = {
     'stats.subtitle': 'Statistik',
     'stats.progressWeek': 'Fortschritt je Woche',
     'stats.badges': 'Abzeichen',
+    'stats.inProgress': 'In Arbeit',
     'stats.coRanges': 'Checkout nach Rest-Bereich',
     'stats.coRangesHint': 'Treffer / Versuche je Rest',
     'stats.pressure': 'Unter Druck (Entscheidungs-Leg)',
@@ -680,6 +682,7 @@ const DICT = {
     'ach.cat.Meilensteine': 'Milestones',
     'ach.cat.Training': 'Training',
     'ach.cat.Kurios': 'Fun',
+    'ach.cat.Team': 'Team/Doubles',
 
     'stats.title': 'Statistics',
     'history.title': 'Match history',
@@ -863,6 +866,7 @@ const DICT = {
     'stats.subtitle': 'Statistics',
     'stats.progressWeek': 'Progress per week',
     'stats.badges': 'Badges',
+    'stats.inProgress': 'In progress',
     'stats.coRanges': 'Checkout by remaining',
     'stats.coRangesHint': 'Hits / attempts per remaining',
     'stats.pressure': 'Under pressure (decider leg)',

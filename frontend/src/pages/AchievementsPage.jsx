@@ -12,6 +12,8 @@ const CAT_COLOR = {
   Checkout: '#3B82F6',
   Meilensteine: '#8B5CF6',
   Training: '#14B8A6',
+  Kurios: '#EC4899',
+  Team: '#0EA5E9',
 };
 
 // Rundes Achievement-Bild: farbige Medaille mit Emoji; gesperrt = ausgegraut.

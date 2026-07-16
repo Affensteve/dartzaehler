@@ -6,7 +6,9 @@ const { BOT_LEVELS } = require('../utils/validators');
 const coach = require('../utils/coach');
 const achievementStore = require('../models/achievementStore');
 const doubleProfile = require('../utils/doubleProfile');
-const { catalog: achCatalog } = require('../utils/achievements');
+const statsStore = require('../models/statsStore');
+const trainingStore = require('../models/trainingStore');
+const { catalog: achCatalog, progressFor } = require('../utils/achievements');
 const ACH_MAP = new Map(achCatalog().map((a) => [a.id, a]));
 
 const router = express.Router();
@@ -38,18 +40,39 @@ router.get('/:id/doubles', (req, res) => {
   res.json({ list, best: list[0] || null, worst: list.length ? list[list.length - 1] : null });
 });
 
-// GET /api/players/:id/achievements – erspielte Abzeichen mit Zeitstempel (neueste zuerst)
+// GET /api/players/:id/achievements – erspielte Abzeichen (neueste zuerst) +
+// Fortschritt der noch offenen, messbaren Achievements (höchster Fortschritt zuerst).
 router.get('/:id/achievements', (req, res) => {
   const id = Number(req.params.id);
   if (!playerStore.get(id)) return res.status(404).json({ error: 'Spieler nicht gefunden.' });
-  const out = achievementStore
-    .earnedForPlayer(id)
+  const earnedRows = achievementStore.earnedForPlayer(id);
+  const earnedSet = new Set(earnedRows.map((r) => r.id));
+  const earned = earnedRows
     .map((r) => {
       const a = ACH_MAP.get(r.id);
       return a ? { id: a.id, cat: a.cat, name: a.name, nameEn: a.nameEn, icon: a.icon, earnedAt: r.earnedAt } : null;
     })
     .filter(Boolean);
-  res.json(out);
+
+  const ctx = {
+    agg: statsStore.get(id, 'all', { training: false }) || {},
+    training: trainingStore.playerStats(id, 'all') || {},
+    playStreak: statsStore.playDayStreak(id),
+    trainStreak: trainingStore.trainDayStreak(id),
+  };
+  const prog = progressFor(ctx);
+  const progress = Object.entries(prog)
+    .filter(([aid]) => !earnedSet.has(aid) && (prog[aid].cur > 0)) // nur begonnene offene Ziele
+    .map(([aid, p]) => {
+      const a = ACH_MAP.get(aid);
+      return a
+        ? { id: aid, cat: a.cat, name: a.name, nameEn: a.nameEn, desc: a.desc, descEn: a.descEn, icon: a.icon, cur: p.cur, target: p.target, pct: p.pct }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.pct - a.pct);
+
+  res.json({ earned, progress });
 });
 
 // POST /api/players – neuen Spieler anlegen
