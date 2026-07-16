@@ -112,6 +112,68 @@ const ACHIEVEMENTS = [
 
 const byId = new Map(ACHIEVEMENTS.map((a) => [a.id, a]));
 
+// Fortschritt für kumulative/messbare Achievements: liefert je ID {cur, target}.
+// Nur für Achievements sinnvoll, deren Ziel über einen Zählwert läuft; rein
+// ereignisbasierte (Comeback, Whitewash, 9-Darter …) haben keinen Fortschritt.
+const sec = (c, k) => n(c.agg.sectors && c.agg.sectors[k]);
+const ALLROUND_MODES = ['clock', 'bob27', 'countup', 'cricket', 'shanghai', 'halveit', 'checkout'];
+const PROGRESS = {
+  'win-1': (c) => ({ cur: n(c.agg.wins), target: 1 }),
+  'win-10': (c) => ({ cur: n(c.agg.wins), target: 10 }),
+  'win-50': (c) => ({ cur: n(c.agg.wins), target: 50 }),
+  'win-100': (c) => ({ cur: n(c.agg.wins), target: 100 }),
+  'win-streak-3': (c) => ({ cur: n(c.agg.winStreak), target: 3 }),
+  'max-180-1': (c) => ({ cur: n(c.agg.s180), target: 1 }),
+  'max-180-10': (c) => ({ cur: n(c.agg.s180), target: 10 }),
+  'max-180-50': (c) => ({ cur: n(c.agg.s180), target: 50 }),
+  'max-180-100': (c) => ({ cur: n(c.agg.s180), target: 100 }),
+  'turn-100': (c) => ({ cur: n(c.agg.maxTurn), target: 100 }),
+  'turn-140': (c) => ({ cur: n(c.agg.maxTurn), target: 140 }),
+  'hit-t20': (c) => ({ cur: sec(c, 'T20'), target: 1 }),
+  'hit-t20-50': (c) => ({ cur: sec(c, 'T20'), target: 50 }),
+  'first-double': (c) => ({ cur: n(c.agg.doubleHits), target: 1 }),
+  'hit-bull': (c) => ({ cur: sec(c, 'D25'), target: 1 }),
+  'hit-bull-25': (c) => ({ cur: sec(c, 'D25'), target: 25 }),
+  'co-100': (c) => ({ cur: n(c.agg.maxCheckout), target: 100 }),
+  'co-120': (c) => ({ cur: n(c.agg.maxCheckout), target: 120 }),
+  'co-big-fish': (c) => ({ cur: n(c.agg.maxCheckout), target: 170 }),
+  'games-1': (c) => ({ cur: n(c.agg.games), target: 1 }),
+  'games-10': (c) => ({ cur: n(c.agg.games), target: 10 }),
+  'games-50': (c) => ({ cur: n(c.agg.games), target: 50 }),
+  'games-100': (c) => ({ cur: n(c.agg.games), target: 100 }),
+  'games-500': (c) => ({ cur: n(c.agg.games), target: 500 }),
+  'games-1000': (c) => ({ cur: n(c.agg.games), target: 1000 }),
+  'legs-50': (c) => ({ cur: n(c.agg.legsWon), target: 50 }),
+  'legs-250': (c) => ({ cur: n(c.agg.legsWon), target: 250 }),
+  'legs-1000': (c) => ({ cur: n(c.agg.legsWon), target: 1000 }),
+  'darts-10k': (c) => ({ cur: n(c.agg.dartsTotal), target: 10000 }),
+  'darts-50k': (c) => ({ cur: n(c.agg.dartsTotal), target: 50000 }),
+  'play-streak-7': (c) => ({ cur: n(c.playStreak), target: 7 }),
+  'train-1': (c) => ({ cur: trainSessions(c.training), target: 1 }),
+  'train-25': (c) => ({ cur: trainSessions(c.training), target: 25 }),
+  'train-100': (c) => ({ cur: trainSessions(c.training), target: 100 }),
+  'train-streak-7': (c) => ({ cur: n(c.trainStreak), target: 7 }),
+  'allrounder': (c) => ({ cur: ALLROUND_MODES.filter((m) => c.training && c.training[m] && c.training[m].sessions > 0).length, target: 7 }),
+};
+
+// Fortschritt für alle messbaren Achievements berechnen. cur wird auf target
+// gedeckelt; pct in Prozent.
+function progressFor(ctx) {
+  const out = {};
+  for (const [id, fn] of Object.entries(PROGRESS)) {
+    try {
+      const r = fn(ctx);
+      if (r && r.target > 0) {
+        const cur = Math.max(0, Math.min(r.cur, r.target));
+        out[id] = { cur, target: r.target, pct: Math.round((cur / r.target) * 100) };
+      }
+    } catch {
+      /* defensiv ignorieren */
+    }
+  }
+  return out;
+}
+
 const EN = {"win-1": ["First Win", "Win your first game."], "win-10": ["Routined", "Win 10 games."], "win-50": ["Frequent Winner", "Win 50 games."], "win-100": ["Champion", "Win 100 games."], "whitewash": ["Whitewash", "Win a match (min. 2 legs) without conceding a single leg."], "turn-100": ["Ton", "Score a visit of 100 or more."], "turn-140": ["Ton-40", "Score a visit of 140 or more."], "max-180-1": ["Maximum!", "Throw your first 180."], "max-180-10": ["180 Collector", "Throw a total of 10 maximums."], "max-180-50": ["180 Machine", "Throw a total of 50 maximums."], "max-180-100": ["180 Legend", "Throw a total of 100 maximums."], "three-180-match": ["Triple Maximum", "Throw three 180s in a single match."], "match-avg-60": ["Solid Run", "Finish a match with a 60+ average."], "match-avg-80": ["Sharpshooter", "Finish a match with an 80+ average."], "match-avg-100": ["Ton Average", "Finish a match with a 100+ average."], "co-100": ["High Finish", "Check out 100 or more in one visit."], "co-120": ["Ton-20 Finish", "Check out 120 or more in one visit."], "co-big-fish": ["Big Fish", "The big one: check out 170 (T20-T20-Bull)."], "nine-darter": ["Nine Darter", "Win a 501 leg with just 9 darts."], "double-master": ["Double Master", "Reach a 40%+ double rate (min. 20 double attempts)."], "games-1": ["Welcome", "Play your first game."], "games-10": ["Settled In", "Play 10 games."], "games-50": ["Regular", "Play 50 games."], "games-100": ["Darts Addict", "Play 100 games."], "legs-50": ["Leg Hunter", "Win 50 legs in total."], "legs-250": ["Leg Factory", "Win 250 legs in total."], "train-1": ["Training Kickoff", "Complete your first training session."], "train-25": ["Diligent", "Complete 25 training sessions."], "train-100": ["Training World Champion", "Complete 100 training sessions."], "allrounder": ["All-Rounder", "Play each of the 7 training modes at least once."], "bob27-50": ["Bob Cracked", "Reach 50+ points in Bob’s 27."], "bob27-100": ["Double Guru", "Reach 100+ points in Bob’s 27."], "countup-400": ["Count-up Cannon", "Reach 400+ points in Count-up."], "countup-500": ["Count-up King", "Reach 500+ points in Count-up."], "countup-180": ["180 in Training", "Throw a 180 in Count-up training."], "clock-40": ["Clockwork", "Finish Around the Clock in 40 darts or fewer."], "clock-25": ["Clock Master", "Finish Around the Clock in 25 darts or fewer."], "cricket-30": ["Cricket Ace", "Close Cricket in 30 darts or fewer."], "shanghai-hit": ["Shanghai!", "Hit a Shanghai (single, double and triple of a number) in Shanghai training."], "halveit-200": ["Consistency", "Reach 200+ points in Halve-it."], "co-challenge-1": ["Finisher", "Master the checkout challenge (at least 1 checkout)."], "co-challenge-5": ["Double Sniper", "Land 5 checkouts in the checkout challenge."], "hit-t20": ["Triple 20", "Hit a Triple 20."], "hit-t20-50": ["Treble Collector", "Hit 50 Triple 20s in total."], "first-double": ["First Double", "Hit your first checkout double."], "hit-bull": ["Bullseye", "Hit the bullseye (double bull, 50)."], "hit-bull-25": ["Bull Hunter", "Hit 25 bullseyes in total."], "win-streak-3": ["On a Roll", "Win 3 games in a row."], "lowton-501": ["Efficient", "Win a 501 leg in 15 darts or fewer."], "darts-10k": ["Prolific Thrower", "Throw 10,000 darts in total."], "early-bird": ["Early Bird", "Finish a game between 5 and 8 a.m."], "night-owl": ["Night Owl", "Finish a game between midnight and 5 a.m."], "bull-finish": ["Bull Finish", "Check out a leg right on the bullseye."], "clean-set": ["Clean Set", "Win a set without conceding a leg."], "comeback": ["Comeback", "Win a match in which an opponent already had match darts."], "co-streak-5": ["Double Streak", "Win 5 legs in a row by checkout."], "shanghai-live": ["Shanghai", "Hit single, double and triple of the same number in one visit."], "team-win": ["Doubles Win", "Win a doubles/team match."], "team-whitewash": ["Team Whitewash", "Win a match as a team (min. 2 legs) without conceding a leg."], "team-180-leg": ["Joint 180 Leg", "Both partners each throw a 180 in the same leg."], "team-partner-co": ["Partner Checkout", "Both partners contribute to a leg won by checkout."], "games-500": ["Darts Enthusiast", "Play 500 games."], "games-1000": ["Darts Veteran", "Play 1,000 games."], "legs-1000": ["Leg Legend", "Win 1,000 legs in total."], "darts-50k": ["Marathon Thrower", "Throw 50,000 darts in total."], "play-streak-7": ["Daily Darts", "Play on 7 consecutive days."], "match-avg-110": ["World-Class Average", "Finish a match with a 110+ average."], "match-avg-120": ["Dream Average", "Finish a match with a 120+ average."], "high-roller": ["High Roller", "Throw three 140+ visits in one match."], "two-180-row": ["Back-to-back 180", "Throw two 180s in a row."], "bull-bull": ["Bull-Bull Finish", "Check out a leg with two bulls in one visit."], "madhouse": ["Madhouse", "Finish on double 1 (from 2)."], "clutch-finish": ["Clutch Finish", "Win a match with a 100+ checkout."], "bed-breakfast": ["Bed & Breakfast", "Score exactly 26 in one visit."], "three-in-bed": ["Three in a Bed", "Hit the same number three times in one visit."], "nuller": ["Zero Visit", "Throw a visit worth 0 points (three misses)."], "weekend-warrior": ["Weekend Warrior", "Finish a game on a Saturday or Sunday."], "birthday-game": ["Birthday Game", "Play on your birthday (profile birth date)."], "clock-20": ["Clock Pro", "Finish Around the Clock in 20 darts or fewer."], "bob27-150": ["Bob Mastery", "Reach 150+ points in Bob’s 27."], "builder-goal": ["Custom Trainer", "Play a self-made exercise from the training builder."], "train-streak-7": ["Training Week", "Train on 7 consecutive days."], "team-partner-co-3": ["In Sync", "Land three partner checkouts in one doubles match."]};
 
 const ICONS = {"win-1": "🥇", "win-10": "🏅", "win-50": "🏆", "win-100": "👑", "whitewash": "🧹", "turn-100": "💯", "turn-140": "🎯", "max-180-1": "💥", "max-180-10": "🔥", "max-180-50": "⚡", "max-180-100": "🌟", "three-180-match": "🚀", "match-avg-60": "📈", "match-avg-80": "🎯", "match-avg-100": "🏅", "co-100": "✅", "co-120": "🎯", "co-big-fish": "🐟", "nine-darter": "9️⃣", "double-master": "🎯", "games-1": "👋", "games-10": "🙂", "games-50": "📅", "games-100": "🤩", "legs-50": "🦵", "legs-250": "🏭", "train-1": "🏋️", "train-25": "💪", "train-100": "🥋", "allrounder": "🌈", "bob27-50": "🎯", "bob27-100": "🧙", "countup-400": "💣", "countup-500": "👑", "countup-180": "💥", "clock-40": "🕐", "clock-25": "⏱️", "cricket-30": "🦗", "shanghai-hit": "🏙️", "halveit-200": "⚖️", "co-challenge-1": "🎯", "co-challenge-5": "🔫", "hit-t20": "🎯", "hit-t20-50": "🔥", "first-double": "✅", "hit-bull": "🔴", "hit-bull-25": "🎯", "win-streak-3": "🔥", "lowton-501": "🧮", "darts-10k": "🎯", "early-bird": "🌅", "night-owl": "🦉", "bull-finish": "🎯", "clean-set": "🧹", "comeback": "🔄", "co-streak-5": "🎯", "shanghai-live": "🏙️", "team-win": "👥", "team-whitewash": "🧹", "team-180-leg": "💥", "team-partner-co": "🤝", "games-500": "📆", "games-1000": "🎖️", "legs-1000": "🦿", "darts-50k": "🎯", "play-streak-7": "📅", "match-avg-110": "📈", "match-avg-120": "🚀", "high-roller": "💰", "two-180-row": "🔥", "bull-bull": "🔴", "madhouse": "🏚️", "clutch-finish": "🧊", "bed-breakfast": "🍳", "three-in-bed": "🛏️", "nuller": "🫥", "weekend-warrior": "🗓️", "birthday-game": "🎂", "clock-20": "⏱️", "bob27-150": "🧙", "builder-goal": "🛠️", "train-streak-7": "🔥", "team-partner-co-3": "🤝"};
@@ -141,4 +203,4 @@ function satisfiedIds(ctx) {
   return out;
 }
 
-module.exports = { ACHIEVEMENTS, byId, catalog, satisfiedIds };
+module.exports = { ACHIEVEMENTS, byId, catalog, satisfiedIds, progressFor };

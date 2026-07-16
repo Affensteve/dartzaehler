@@ -166,28 +166,60 @@ function pickVoice(lang, gender, overrideURI) {
   return neutral || cand[0];
 }
 
-// --- Sprachausgabe --------------------------------------------------------
-// priority=true unterbricht laufende Ansagen; sonst wird übersprungen, wenn
-// gerade gesprochen wird (schnelle Bot-Aufnahmen stapeln sich so nicht).
-function speak(text, { priority = false, lang, gender, voiceURI } = {}) {
-  if (typeof window === 'undefined' || !window.speechSynthesis || !text) return;
+// --- Sprachausgabe (Warteschlange) ---------------------------------------
+// Ansagen werden gestapelt und nacheinander abgespielt, damit z. B. bei
+// schnellen Bot-Aufnahmen keine Ansage verschluckt wird. priority=true setzt
+// die Warteschlange zurück und spricht sofort (z. B. Eröffnungsansage).
+let speechQueue = [];
+let speaking = false;
+
+function buildUtterance(text, { lang, gender, voiceURI, rate = 0.95, volGain = 0.2 } = {}) {
   const l = lang || settings.lang;
   const g = gender || settings.gender;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = LANG_TAG[l] || 'en-GB';
+  const v = pickVoice(l, g, voiceURI);
+  if (v) u.voice = v;
+  u.rate = rate;
+  u.pitch = 1;
+  u.volume = Math.min(1, settings.volume + volGain);
+  return u;
+}
+
+function pump() {
+  if (speaking) return;
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  const item = speechQueue.shift();
+  if (!item) return;
+  speaking = true;
   try {
-    const synth = window.speechSynthesis;
-    if (priority) synth.cancel();
-    else if (synth.speaking || synth.pending) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = LANG_TAG[l] || 'en-GB';
-    const v = pickVoice(l, g, voiceURI);
-    if (v) u.voice = v;
-    u.rate = 0.95;
-    u.pitch = 1;
-    u.volume = Math.min(1, settings.volume + 0.2);
-    synth.speak(u);
+    const u = buildUtterance(item.text, item.opts);
+    const done = () => {
+      speaking = false;
+      setTimeout(pump, 0);
+    };
+    u.onend = done;
+    u.onerror = done;
+    window.speechSynthesis.speak(u);
   } catch {
-    /* ignore */
+    speaking = false;
+    setTimeout(pump, 0);
   }
+}
+
+function speak(text, { priority = false, ...opts } = {}) {
+  if (typeof window === 'undefined' || !window.speechSynthesis || !text) return;
+  if (priority) {
+    speechQueue = [];
+    speaking = false;
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      /* ignore */
+    }
+  }
+  speechQueue.push({ text, opts });
+  pump();
 }
 
 // --- Clip-Wiedergabe (Modus 'clips', Fallback -> generated/tts) -----------
@@ -218,8 +250,8 @@ export function callCue(name, pref) {
   const gender = (pref && pref.gender) || settings.gender;
   const voiceURI = pref ? undefined : settings.voiceByLang[lang];
   const text = (CUES[lang] && CUES[lang][name]) || CUES.en[name] || '';
-  if (settings.mode === 'clips') playClip(`voice/${lang}`, name, () => speak(text, { priority: true, lang, gender, voiceURI }));
-  else speak(text, { priority: true, lang, gender, voiceURI });
+  if (settings.mode === 'clips') playClip(`voice/${lang}`, name, () => speak(text, { lang, gender, voiceURI }));
+  else speak(text, { lang, gender, voiceURI });
 }
 
 // Cue-Ansage mit angehängtem Spielernamen (z. B. „Leg gewonnen, Steffen!").
@@ -231,7 +263,22 @@ export function sayCueWithName(name, cueName, pref) {
   const voiceURI = pref ? undefined : settings.voiceByLang[lang];
   const base = (CUES[lang] && CUES[lang][cueName]) || CUES.en[cueName] || '';
   const text = name ? `${base.replace(/[!.\s]+$/, '')}, ${name}!` : base;
-  speak(text, { priority: true, lang, gender, voiceURI });
+  speak(text, { lang, gender, voiceURI });
+}
+
+// Finish-Ansage im Stil des Callers: „Name, you require XX" / „Name benötigt noch XX".
+// Wird als Aufnahme in die Warteschlange gehängt (kein Abbruch).
+export function sayRequire(name, score, pref) {
+  if (!settings.enabled || !settings.voice || !score) return;
+  const lang = (pref && pref.lang) || settings.lang;
+  const gender = (pref && pref.gender) || settings.gender;
+  const voiceURI = pref ? undefined : settings.voiceByLang[lang];
+  const num = lang === 'de' ? String(score) : numberWords(score);
+  const text =
+    lang === 'de'
+      ? `${name ? name + ', ' : ''}du benötigst noch ${num}.`
+      : `${name ? name + ', ' : ''}you require ${num}.`;
+  speak(text, { lang, gender, voiceURI });
 }
 
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
@@ -288,21 +335,8 @@ export function sayIntro(names) {
 // angehängt (kein Abbruch), damit er nach der eigentlichen Ansage kommt.
 export function sayCommentary(text) {
   if (!settings.enabled || !settings.voice || !settings.commentary || !text) return;
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  try {
-    const synth = window.speechSynthesis;
-    const l = settings.lang;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = LANG_TAG[l] || 'en-GB';
-    const v = pickVoice(l, settings.gender, settings.voiceByLang[l]);
-    if (v) u.voice = v;
-    u.rate = 1.0;
-    u.pitch = 1;
-    u.volume = Math.min(1, settings.volume + 0.1);
-    synth.speak(u);
-  } catch {
-    /* ignore */
-  }
+  const l = settings.lang;
+  speak(text, { lang: l, gender: settings.gender, voiceURI: settings.voiceByLang[l], rate: 1.0, volGain: 0.1 });
 }
 
 let unlocked = false;

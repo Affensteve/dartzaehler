@@ -1,6 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { playEffect, callCue, sayCueWithName, sayScore, sayIntro, sayCommentary, parseVoicePref } from '../sound';
+import { playEffect, callCue, sayCueWithName, sayScore, sayRequire, sayIntro, sayCommentary, parseVoicePref } from '../sound';
 import { comment } from '../commentary';
+
+// Rest ist per (Doppel-)Finish erreichbar? Bogey-Zahlen ausgenommen.
+const BOGEY = new Set([169, 168, 166, 165, 163, 162, 159]);
+function isFinishable(rem) {
+  return rem >= 2 && rem <= 170 && rem !== 1 && !BOGEY.has(rem);
+}
 
 /**
  * Übersetzt Änderungen des Spielzustands in Sound-Effekte, Voice-Caller-Ansagen
@@ -79,6 +85,12 @@ export default function useMatchSound(game, { announceOnEnter = false, onComment
           if (sc > 0) sayScore(sc, pref);
           if (sc === 180) emit('s180', { name });
           else if (sc >= 100) emit('big', { name, score: sc });
+
+          // Finish-Ansage im Spiel gegen Bots: „Name, you require XX",
+          // sobald der eben werfende Spieler auf einem Finish steht.
+          const vsBot = game.players.some((pl) => pl.type === 'bot');
+          const rem = finisher ? finisher.score : 0;
+          if (vsBot && isFinishable(rem)) sayRequire(name, rem, pref);
         }
       }
     }

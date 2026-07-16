@@ -8,6 +8,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   CircularProgress,
+  LinearProgress,
   Stack,
   Chip,
   Button,
@@ -23,9 +24,16 @@ import { api } from '../api/client';
 import { ACCENT } from '../theme';
 import { useT, useLang } from '../i18n';
 
-function fmtDate(s) {
+// DB-Zeitstempel werden als UTC gespeichert (SQLite datetime('now')). Als UTC
+// interpretieren und in lokaler Zeit als TT.MM.JJJJ HH:MM (24h) ausgeben.
+function fmtDateTime(s) {
   if (!s) return '';
-  return s.replace('T', ' ').slice(0, 16);
+  const iso = s.includes('T') ? s : s.replace(' ', 'T');
+  const hasTz = /[zZ]$|[+-]\d\d:?\d\d$/.test(iso);
+  const d = new Date(hasTz ? iso : iso + 'Z');
+  if (isNaN(d.getTime())) return s;
+  const p = (x) => String(x).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function CoRanges({ cr, t }) {
@@ -77,7 +85,7 @@ export default function PlayerStatsPage() {
   const [row, setRow] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [achievements, setAchievements] = useState([]);
+  const [achievements, setAchievements] = useState({ earned: [], progress: [] });
 
   // Benutzte Pfeile für die Filter-Chips (je Bereich); Filter zurücksetzen bei Wechsel.
   useEffect(() => {
@@ -106,7 +114,10 @@ export default function PlayerStatsPage() {
   }, [id, range, area, dartFilter]);
 
   useEffect(() => {
-    api.getPlayerAchievements(id).then(setAchievements).catch(() => setAchievements([]));
+    api
+      .getPlayerAchievements(id)
+      .then((r) => setAchievements({ earned: (r && r.earned) || [], progress: (r && r.progress) || [] }))
+      .catch(() => setAchievements({ earned: [], progress: [] }));
   }, [id]);
 
   const dartChips = darts.filter((d) => d.dartId != null);
@@ -203,13 +214,13 @@ export default function PlayerStatsPage() {
               <TimelineChart data={timeline} />
             </Box>
 
-            {achievements.length > 0 && (
+            {achievements.earned.length > 0 && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" align="center" sx={{ fontWeight: 800, mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-                  <MilitaryTechIcon fontSize="small" sx={{ color: ACCENT.double }} /> {t('stats.badges')} ({achievements.length})
+                  <MilitaryTechIcon fontSize="small" sx={{ color: ACCENT.double }} /> {t('stats.badges')} ({achievements.earned.length})
                 </Typography>
                 <Stack spacing={0.75}>
-                  {achievements.map((a) => (
+                  {achievements.earned.map((a) => (
                     <Box
                       key={a.id}
                       sx={{ display: 'flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75 }}
@@ -219,7 +230,36 @@ export default function PlayerStatsPage() {
                         {lang === 'de' ? a.name : a.nameEn}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {fmtDate(a.earnedAt)}
+                        {fmtDateTime(a.earnedAt)}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
+            {achievements.progress.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" align="center" sx={{ fontWeight: 800, mb: 1 }}>
+                  {t('stats.inProgress')}
+                </Typography>
+                <Stack spacing={0.75}>
+                  {achievements.progress.map((a) => (
+                    <Box
+                      key={a.id}
+                      sx={{ display: 'flex', alignItems: 'center', gap: 1, border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75, opacity: 0.85 }}
+                    >
+                      <Box component="span" sx={{ fontSize: 22, lineHeight: 1, filter: 'grayscale(1)', opacity: 0.6 }}>{a.icon}</Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 700 }} noWrap>{lang === 'de' ? a.name : a.nameEn}</Typography>
+                        <LinearProgress
+                          variant="determinate"
+                          value={a.pct}
+                          sx={{ height: 6, borderRadius: 3, my: 0.5 }}
+                        />
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap', fontWeight: 700 }}>
+                        {a.cur}/{a.target}
                       </Typography>
                     </Box>
                   ))}
