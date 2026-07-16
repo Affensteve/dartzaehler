@@ -147,7 +147,7 @@ export default function CastPage() {
           pb: 3,
         }}
       >
-        {game.players.map((p) => (
+        {game.players.map((p, idx) => (
           <PlayerCard
             key={p.id}
             player={p}
@@ -157,6 +157,7 @@ export default function CastPage() {
             scoreboard
             format={game.format}
             avatar={avatarFor(p)}
+            avatarSide={game.players.length === 2 ? (idx === 0 ? 'right' : 'left') : 'left'}
           />
         ))}
       </Box>

@@ -60,7 +60,7 @@ function Pips({ won, target, color, size = 11 }) {
  * Spieler umrahmt, Leg-/Satz-Pips. Im Summen-Modus (sumMode) entfallen Einzelwürfe
  * und die Pfeilzahl; der Ø bleibt. `format` liefert die Ziele für die Pips.
  */
-function PlayerCard({ player, checkoutSuggestion, isBestOf, sumMode = false, scoreboard = false, format, avatar = null }) {
+function PlayerCard({ player, checkoutSuggestion, isBestOf, sumMode = false, scoreboard = false, format, avatar = null, avatarSide = 'left' }) {
   const t = useT();
   const active = player.isActive;
   const isBot = player.type === 'bot';
@@ -114,8 +114,17 @@ function PlayerCard({ player, checkoutSuggestion, isBestOf, sumMode = false, sco
             </Box>
           ))
         ) : avatar ? (
-          <Box sx={{ position: 'absolute', left: 12, top: 12 }}>
-            <Avatar photo={avatar.photo} color={avatar.color} name={player.name} size={56} avatars={avatar.avatars || null} />
+          // Einzel-Avatar: vertikal mittig, so hoch wie Score + Würfe, zur Boxinnenseite
+          // (linker Spieler → rechts, rechter Spieler → links).
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              [avatarSide === 'right' ? 'right' : 'left']: 20,
+            }}
+          >
+            <Avatar photo={avatar.photo} color={avatar.color} name={player.name} size={120} avatars={avatar.avatars || null} />
           </Box>
         ) : null}
         <Typography
@@ -344,6 +353,7 @@ function propsEqual(a, b) {
     a.isBestOf === b.isBestOf &&
     a.sumMode === b.sumMode &&
     a.scoreboard === b.scoreboard &&
+    a.avatarSide === b.avatarSide &&
     JSON.stringify(a.player) === JSON.stringify(b.player) &&
     JSON.stringify(a.checkoutSuggestion) === JSON.stringify(b.checkoutSuggestion) &&
     JSON.stringify(a.format) === JSON.stringify(b.format) &&
