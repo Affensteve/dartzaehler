@@ -49,6 +49,9 @@ app.use('/api/matches', require('./routes/matches'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/achievements', require('./routes/achievements'));
 app.use('/api/teams', require('./routes/teams'));
+app.use('/api/ratings', require('./routes/ratings'));
+app.use('/api/leagues', require('./routes/leagues'));
+app.use('/api/party', require('./routes/party'));
 
 app.get('/api/health', (req, res) => res.json({ ok: true, version: '1.0.0' }));
 

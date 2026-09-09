@@ -12,7 +12,7 @@
  *   - multiplier 1|2|3     = Single / Double / Triple
  */
 
-const START_SCORES = { 501: 501, 301: 301, 101: 101 };
+const START_SCORES = { 701: 701, 601: 601, 501: 501, 301: 301, 101: 101 };
 
 /** Punktwert eines einzelnen Darts. */
 function dartPoints(dart) {
@@ -348,28 +348,85 @@ function routeToDouble(score, doubleOption, dartCount) {
  * @param {Object<string, number>|null} doubleProfile Trefferquote (0..1) je Doppel-Label
  * @returns {{route: string[], personalized: boolean, targetDouble?: string}|null}
  */
-function findPersonalizedCheckout(score, mode, doubleProfile, maxDarts = 3) {
+// Summe der (bekannten) Triple-Trefferquoten der Setup-Würfe einer Route.
+function scoreTriples(route, tripleProfile) {
+  if (!tripleProfile || !route) return 0;
+  return route.reduce((acc, l) => acc + (l && l[0] === 'T' ? tripleProfile[l] || 0 : 0), 0);
+}
+
+// Wie routeToDouble, wählt aber unter gleichwertigen 3-Dart-Routen jene mit den
+// vom Spieler am besten getroffenen Setup-Triples.
+function bestRouteToDouble(score, doubleOption, dartCount, tripleProfile) {
+  if (dartCount !== 3) return routeToDouble(score, doubleOption, dartCount);
+  const rem = score - doubleOption.points;
+  if (rem <= 0) return null;
+  let best = null;
+  for (const a of OPTIONS) {
+    const rem2 = rem - a.points;
+    if (rem2 <= 0) continue;
+    const b = setupByPoints.get(rem2);
+    if (!b) continue;
+    const route = [a.label, b.label, doubleOption.label];
+    const sc = scoreTriples(route, tripleProfile);
+    if (!best || sc > best.sc) best = { route, sc };
+  }
+  return best ? best.route : null;
+}
+
+/**
+ * Wie `findCheckout`, weicht aber – nur im Double-Out-Modus – auf ein Doppel aus,
+ * das der Spieler zuverlässiger trifft (`doubleProfile`), und wählt bei gleicher
+ * Dartzahl die Setup-Triples, die er am besten trifft (`tripleProfile`). Die
+ * Dartzahl bleibt immer identisch zur Standard-Route.
+ * @param {number} score
+ * @param {'double'|'single'|'master'} mode
+ * @param {Object<string, number>|null} doubleProfile Trefferquote (0..1) je Doppel-Label
+ * @param {number} maxDarts
+ * @param {Object<string, number>|null} tripleProfile Trefferquote (0..1) je Triple-Label
+ * @returns {{route: string[], personalized: boolean, targetDouble?: string}|null}
+ */
+function findPersonalizedCheckout(score, mode, doubleProfile, maxDarts = 3, tripleProfile = null) {
   const base = findCheckout(score, mode, maxDarts);
   if (!base) return null;
-  if (mode !== 'double' || !doubleProfile) return { route: base, personalized: false };
+  if (mode !== 'double') return { route: base, personalized: false };
+  const hasD = doubleProfile && Object.keys(doubleProfile).length > 0;
+  const hasT = tripleProfile && Object.keys(tripleProfile).length > 0;
+  if (!hasD && !hasT) return { route: base, personalized: false };
 
   const n = base.length;
   const baseKey = base[base.length - 1];
-  const baseRate = doubleProfile[baseKey] ?? 0;
+  const baseRate = (hasD ? doubleProfile[baseKey] : undefined) ?? 0;
 
-  let best = null;
-  for (const d of DOUBLE_FINISHERS) {
-    if (d.label === baseKey) continue;
-    const rate = doubleProfile[d.label];
-    if (rate === undefined || rate - baseRate < PERSONALIZATION_MIN_EDGE) continue;
-    const route = routeToDouble(score, d, n);
-    if (!route) continue;
-    if (!best || rate > best.rate) best = { route, rate, targetDouble: d.label };
+  // 1) Finish-Doppel evtl. tauschen (nur bei klar besserer Quote).
+  let targetLabel = baseKey;
+  let dChanged = false;
+  if (hasD) {
+    let bestRate = baseRate;
+    for (const d of DOUBLE_FINISHERS) {
+      if (d.label === baseKey) continue;
+      const rate = doubleProfile[d.label];
+      if (rate === undefined || rate - baseRate < PERSONALIZATION_MIN_EDGE) continue;
+      if (routeToDouble(score, d, n) && rate > bestRate) {
+        bestRate = rate;
+        targetLabel = d.label;
+        dChanged = true;
+      }
+    }
   }
+  const dblOpt = DOUBLE_FINISHERS.find((o) => o.label === targetLabel) || DOUBLE_FINISHERS.find((o) => o.label === baseKey);
+  const refRoute = dChanged ? routeToDouble(score, dblOpt, n) || base : base;
 
-  return best
-    ? { route: best.route, personalized: true, targetDouble: best.targetDouble }
-    : { route: base, personalized: false };
+  // 2) Setup-Triples optimieren (nur wenn es die Triple-Quote wirklich verbessert).
+  let route = refRoute;
+  let tChanged = false;
+  if (hasT && dblOpt) {
+    const opt = bestRouteToDouble(score, dblOpt, n, tripleProfile);
+    if (opt && scoreTriples(opt, tripleProfile) > scoreTriples(refRoute, tripleProfile)) {
+      route = opt;
+      tChanged = true;
+    }
+  }
+  return { route, personalized: dChanged || tChanged, targetDouble: dChanged ? targetLabel : undefined };
 }
 
 module.exports = {

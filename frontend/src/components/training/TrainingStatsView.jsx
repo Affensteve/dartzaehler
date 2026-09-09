@@ -1,6 +1,7 @@
 import { Box, Paper, Typography, Stack } from '@mui/material';
 import { MODE_BY_ID, TRAINING_MODES, localizeMode } from './modes';
 import { ACCENT, MONO } from '../../theme';
+import DartboardHeatmap from '../DartboardHeatmap';
 import { useT, useLang, t as tr } from '../../i18n';
 
 const FIELDS = [...Array(20)].map((_, i) => String(i + 1)).concat(['Bull']);
@@ -17,6 +18,7 @@ function viewFor(mode, m) {
       return {
         metrics: [[tr('ts.sessions'), m.sessions], [tr('ts.recordDarts'), m.best], [tr('ts.avgDarts'), avg(d.darts || 0, m.sessions)]],
         maps: [{ title: tr('ts.mapMissField'), entries: entriesFrom(d.missesByField, FIELDS) }],
+        heat: { values: d.missesByField || {}, bull: (d.missesByField || {}).Bull || 0, base: '#C62828', title: tr('ts.heatWeak') },
       };
     case 'bob27':
       return {
@@ -109,6 +111,11 @@ export default function TrainingStatsView({ stats }) {
                 <BarList entries={mp.entries} />
               </Box>
             ))}
+            {v.heat && Object.keys(v.heat.values).length > 0 && (
+              <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
+                <DartboardHeatmap values={v.heat.values} bull={v.heat.bull} base={v.heat.base} title={v.heat.title} size={220} />
+              </Box>
+            )}
           </Paper>
         );
       })}

@@ -16,7 +16,10 @@ function DartBoxes({ darts, large = false }) {
             height: large ? 44 : 34,
             borderRadius: 1,
             bgcolor: (t) => (t.palette.mode === 'dark' ? '#2b3140' : '#e2e6ec'),
-            color: 'text.primary',
+            // Noch nicht vom Server bestätigte Würfe grau, bestätigte in Normalfarbe.
+            color: d && d.pending ? 'text.disabled' : 'text.primary',
+            opacity: d && d.pending ? 0.7 : 1,
+            transition: 'color 120ms ease, opacity 120ms ease',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -158,7 +161,8 @@ function PlayerCard({ player, checkoutSuggestion, isBestOf, sumMode = false, sco
             fontWeight: 700,
             fontSize: { md: 72, lg: 88 },
             lineHeight: 1.05,
-            color: 'text.primary',
+            color: player.scorePending ? 'text.disabled' : 'text.primary',
+            transition: 'color 120ms ease',
           }}
         >
           {player.score}
@@ -245,7 +249,8 @@ function PlayerCard({ player, checkoutSuggestion, isBestOf, sumMode = false, sco
                 fontWeight: 700,
                 fontSize: { xs: 40, sm: 48 },
                 lineHeight: 1,
-                color: 'text.primary',
+                color: player.scorePending ? 'text.disabled' : 'text.primary',
+                transition: 'color 120ms ease',
               }}
             >
               {player.score}

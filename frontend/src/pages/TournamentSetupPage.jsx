@@ -14,11 +14,16 @@ import {
   ToggleButtonGroup,
   FormControlLabel,
   Checkbox,
+  Tooltip,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Header from '../components/Header';
 import GameConfig from '../components/GameConfig';
 import PlayerSetupList, { makeHuman, makeBot } from '../components/PlayerSetupList';
+import TeamSetupList, { makeTeam } from '../components/TeamSetupList';
 import { api } from '../api/client';
 import { CARD_CUT } from '../theme';
 import { useT, t as tr } from '../i18n';
@@ -66,11 +71,12 @@ export default function TournamentSetupPage() {
   const [config, setConfig] = useState({
     mode: 501,
     checkIn: 'straight',
-    satzLegMode: 'firstto',
+    satzLegMode: 'bestof',
     sets: 1,
     legs: 3,
     maxRounds: 20,
     inputMode: 'numpad',
+    bullOffRandomField: false,
   });
   const [groupCount, setGroupCount] = useState(1);
   const [koEnabled, setKoEnabled] = useState(false);
@@ -78,12 +84,17 @@ export default function TournamentSetupPage() {
   const [thirdPlace, setThirdPlace] = useState(true);
   const [koFmt, setKoFmt] = useState({ satzLegMode: 'bestof', legs: 3, sets: 1 });
   const [finalFmt, setFinalFmt] = useState({ satzLegMode: 'bestof', legs: 5, sets: 1 });
+  const [seedByElo, setSeedByElo] = useState(false);
 
   const [players, setPlayers] = useState([makeHuman(''), makeBot('easy')]);
   const [savedPlayers, setSavedPlayers] = useState([]);
   const [darts, setDarts] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState('single'); // 'single' | 'double'
+  const [teams, setTeams] = useState([makeTeam(), makeTeam()]);
+  const [savedTeams, setSavedTeams] = useState([]);
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
     api
@@ -91,7 +102,24 @@ export default function TournamentSetupPage() {
       .then((list) => setSavedPlayers(list.filter((p) => p.type === 'human')))
       .catch(() => {});
     api.listDarts().then(setDarts).catch(() => {});
+    api.listSavedTeams().then(setSavedTeams).catch(() => {});
   }, []);
+
+  const TEAM_COLORS = ['#006EC7', '#00A3A3', '#2E7D32', '#C62828', '#F9A825', '#6A1B9A', '#EC407A', '#455A64'];
+  const saveTeam = async (tm) => {
+    const members = tm.members.filter((m) => m.name.trim()).map((m) => ({ id: m.id, name: m.name.trim() }));
+    if (!members.length) return;
+    const nm = tm.name.trim() || members.map((m) => m.name).join(' & ');
+    const color = tm.color || TEAM_COLORS[savedTeams.length % TEAM_COLORS.length];
+    try {
+      await api.createSavedTeam({ name: nm, color, members });
+      setSavedTeams(await api.listSavedTeams());
+      setMsg(t('ts.savedMsg'));
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  const namedTeams = teams.filter((tm) => tm.members.some((m) => m.name.trim())).length;
 
   const resolvePlayerId = async (p, pname) => {
     if (p.type !== 'human') return null;
@@ -102,34 +130,56 @@ export default function TournamentSetupPage() {
 
   const create = async () => {
     setError(null);
-    if (players.length < 2) {
-      setError(t('tour.min2'));
+    if (mode === 'single' ? players.length < 2 : namedTeams < 2) {
+      setError(mode === 'single' ? t('tour.min2') : t('tour.min2teams'));
       return;
     }
     setBusy(true);
     try {
-      const roster = [];
-      for (let i = 0; i < players.length; i++) {
-        const p = players[i];
-        const pname = p.name.trim() || (p.type === 'bot' ? p.name : t('setup.playerN', { n: i + 1 }));
-        const id = await resolvePlayerId(p, pname);
-        roster.push({ id: id || undefined, name: pname, type: p.type, botLevel: p.botLevel, checkoutMode: p.checkoutMode, dartId: p.dartId });
-      }
-      const t = await api.createTournament({
+      const common = {
         name,
         ...config,
         groupCount,
         koEnabled,
         koAdvance,
         thirdPlace,
+        seedByElo,
         phaseFormats: {
           group: { satzLegMode: config.satzLegMode, sets: config.sets, legs: config.legs },
           ko: koFmt,
           final: finalFmt,
         },
-        players: roster,
-      });
-      navigate(`/tournament/${t.id}`);
+      };
+      let created;
+      if (mode === 'double') {
+        const teamPayload = [];
+        for (const tm of teams) {
+          const members = [];
+          for (const m of tm.members) {
+            const nm = m.name.trim();
+            if (!nm) continue;
+            const id = await resolvePlayerId({ ...m, type: 'human' }, nm);
+            members.push({ id, name: nm, dartId: m.dartId, checkoutMode: m.checkoutMode });
+          }
+          if (members.length) teamPayload.push({ name: tm.name.trim(), color: tm.color || null, checkoutMode: tm.checkoutMode, members });
+        }
+        if (teamPayload.length < 2) {
+          setError(t('tour.min2teams'));
+          setBusy(false);
+          return;
+        }
+        created = await api.createTournament({ ...common, teams: teamPayload });
+      } else {
+        const roster = [];
+        for (let i = 0; i < players.length; i++) {
+          const p = players[i];
+          const pname = p.name.trim() || (p.type === 'bot' ? p.name : t('setup.playerN', { n: i + 1 }));
+          const id = await resolvePlayerId(p, pname);
+          roster.push({ id: id || undefined, name: pname, type: p.type, botLevel: p.botLevel, checkoutMode: p.checkoutMode, dartId: p.dartId });
+        }
+        created = await api.createTournament({ ...common, players: roster });
+      }
+      navigate(`/tournament/${created.id}`);
     } catch (e) {
       setError(e.message);
       setBusy(false);
@@ -146,6 +196,19 @@ export default function TournamentSetupPage() {
           {t('tour.groupFormat')}
         </Typography>
         <GameConfig config={config} setConfig={setConfig} allowUnlimited={false} />
+
+        <FormControlLabel
+          sx={{ mt: 1 }}
+          control={<Checkbox checked={seedByElo} onChange={(e) => setSeedByElo(e.target.checked)} />}
+          label={
+            <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              {t('tour.seedElo')}
+              <Tooltip title={t('tour.seedEloInfo')} enterTouchDelay={0} leaveTouchDelay={6000} arrow>
+                <InfoOutlinedIcon sx={{ fontSize: 16, cursor: 'help', color: 'text.secondary' }} />
+              </Tooltip>
+            </Box>
+          }
+        />
 
         <Paper variant="outlined" sx={{ p: 2, mt: 2, clipPath: CARD_CUT }}>
           <Typography sx={{ fontWeight: 700, mb: 1 }}>{t('tour.mode')}</Typography>
@@ -196,16 +259,29 @@ export default function TournamentSetupPage() {
         </Paper>
 
         <Divider sx={{ my: 2 }} />
-        <PlayerSetupList
-          players={players}
-          setPlayers={setPlayers}
-          savedPlayers={savedPlayers}
-          darts={darts}
-          onRename={async (pid, newName) => {
-            await api.updatePlayer(pid, { name: newName });
-            setSavedPlayers((list) => list.map((sp) => (sp.id === pid ? { ...sp, name: newName } : sp)));
-          }}
-        />
+        <Tabs value={mode} onChange={(e, v) => v && setMode(v)} variant="fullWidth" sx={{ mb: 1.5 }}>
+          <Tab value="single" label={t('setup.tabSingle')} />
+          <Tab value="double" label={t('setup.tabDouble')} />
+        </Tabs>
+        {mode === 'single' ? (
+          <PlayerSetupList
+            players={players}
+            setPlayers={setPlayers}
+            savedPlayers={savedPlayers}
+            darts={darts}
+            onRename={async (pid, newName) => {
+              await api.updatePlayer(pid, { name: newName });
+              setSavedPlayers((list) => list.map((sp) => (sp.id === pid ? { ...sp, name: newName } : sp)));
+            }}
+          />
+        ) : (
+          <TeamSetupList teams={teams} setTeams={setTeams} savedPlayers={savedPlayers} savedTeams={savedTeams} onSaveTeam={saveTeam} />
+        )}
+        {msg && (
+          <Alert severity="success" sx={{ mt: 2 }} onClose={() => setMsg('')}>
+            {msg}
+          </Alert>
+        )}
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}
@@ -230,7 +306,7 @@ export default function TournamentSetupPage() {
             variant="contained"
             size="large"
             fullWidth
-            disabled={busy || players.length < 2}
+            disabled={busy || (mode === 'single' ? players.length < 2 : namedTeams < 2)}
             startIcon={<EmojiEventsIcon />}
             sx={{ py: 1.5, fontSize: 18 }}
             onClick={create}

@@ -29,6 +29,7 @@ import BoardInput from '../components/BoardInput';
 import useGame from '../hooks/useGame';
 import useMatchSound from '../hooks/useMatchSound';
 import { api } from '../api/client';
+import { getSoundSettings, subscribeSound } from '../sound';
 import { ACCENT } from '../theme';
 import { useT, useLang, gameLabel } from '../i18n';
 
@@ -37,9 +38,10 @@ export default function GamePage() {
   const navigate = useNavigate();
   const t = useT();
   const lang = useLang();
-  const { game, error, loading, throwDart, throwMisses, submitVisit, undo, bullOff, finishGame } = useGame(id);
+  const { game, error, loading, throwDart, throwTurn, throwMisses, submitVisit, undo, surrender, bullOff, finishGame } = useGame(id);
   useMatchSound(game);
   const [askAbort, setAskAbort] = useState(false);
+  const [surrenderPick, setSurrenderPick] = useState(false);
   const [askFinish, setAskFinish] = useState(false);
   // Refs der gestapelten Mobil-Karten – zum Einscrollen des aktiven Spielers.
   const cardRefs = useRef({});
@@ -62,6 +64,20 @@ export default function GamePage() {
       : p.dbId != null
       ? avatarMap[p.dbId]
       : null;
+  // Spielerbilder in der Spielansicht sind optional (Default aus, nur Cast zeigt sie immer).
+  const [showAvatars, setShowAvatars] = useState(getSoundSettings().avatarsInGame);
+  const [batchScoring, setBatchScoring] = useState(getSoundSettings().batchScoring);
+  const [pending, setPending] = useState([]); // lokal gepufferte, noch nicht gesendete Darts
+  const [sending, setSending] = useState([]); // gesendet, warten auf Server-Bestätigung (grau)
+  useEffect(
+    () =>
+      subscribeSound((s) => {
+        setShowAvatars(s.avatarsInGame);
+        setBatchScoring(s.batchScoring);
+      }),
+    []
+  );
+  const gameAvatar = (p) => (showAvatars ? avatarFor(p) : null);
 
   const activeIdx = game && game.status === 'playing' ? game.currentPlayerIndex : -1;
   useEffect(() => {
@@ -118,6 +134,65 @@ export default function GamePage() {
   const isUnlimited = game.format.satzLegMode === 'unlimited';
   const roundNumber = game.roundNumber ?? 1;
   const inputMode = game.inputMode || 'numpad'; // vor Spielbeginn festgelegte Zählvariante
+
+  // Optimistische Aufnahme-Bündelung (nur Scoring, Rest > 170): Darts lokal sammeln
+  // und gebündelt senden – kein Warten je Dart. Im Checkout-Bereich sofort je Dart.
+  const labelFor = (d) => {
+    if (!d || d.segment === 0) return '';
+    if (d.segment === 25) return d.multiplier === 2 ? 'Bull' : '25';
+    return (d.multiplier === 2 ? 'D' : d.multiplier === 3 ? 'T' : '') + d.segment;
+  };
+  const buffering =
+    batchScoring && (inputMode === 'numpad' || inputMode === 'board') && current && current.score > 170;
+  // Noch nicht vom Server bestätigte Darts (lokal gepuffert + gerade gesendet) – werden grau dargestellt.
+  const unconfirmed = [...sending, ...pending];
+  const pendingPoints = unconfirmed.reduce((s, d) => s + d.segment * d.multiplier, 0);
+  // Bereits am Server liegende Darts dieser Aufnahme berücksichtigen (z. B. nach
+  // einer Korrektur per Undo), damit die Aufnahme bei 3 Darts sicher abgeschickt wird.
+  const serverDarts = current && current.currentTurn ? current.currentTurn.length : 0;
+  const need = Math.max(1, 3 - serverDarts);
+  const flushTurn = (darts) => {
+    setSending(darts); // grau anzeigen, bis der Server die Aufnahme bestätigt
+    setPending([]);
+    Promise.resolve(throwTurn(darts)).finally(() => setSending([]));
+  };
+  const handleThrow = (dart) => {
+    if (!buffering) {
+      throwDart(dart);
+      return;
+    }
+    const next = [...pending, dart];
+    if (next.length >= need) flushTurn(next.slice(0, need));
+    else setPending(next);
+  };
+  const handleMisses = (nn) => {
+    if (!buffering) {
+      throwMisses(nn);
+      return;
+    }
+    const next = [...pending, ...Array.from({ length: nn }, () => ({ segment: 0, multiplier: 1 }))];
+    if (next.length >= need) flushTurn(next.slice(0, need));
+    else setPending(next);
+  };
+  const handleUndo = () => {
+    if (pending.length) setPending(pending.slice(0, -1));
+    else undo();
+  };
+  const dartsThisTurn = (current && current.currentTurn ? current.currentTurn.length : 0) + unconfirmed.length;
+  const dispPlayers = unconfirmed.length
+    ? game.players.map((p, i) =>
+        i === game.currentPlayerIndex
+          ? {
+              ...p,
+              currentTurn: [...(p.currentTurn || []), ...unconfirmed.map((d) => ({ ...d, label: labelFor(d), pending: true }))],
+              turnScore: (p.turnScore || 0) + pendingPoints,
+              // Restscore lokal reduzieren, solange der Server die Aufnahme noch nicht bestätigt hat.
+              score: (p.score || 0) - pendingPoints,
+              scorePending: true,
+            }
+          : p
+      )
+    : game.players;
 
   const who = game.messagePlayer;
   let banner = null;
@@ -195,7 +270,7 @@ export default function GamePage() {
             gap: 1,
           }}
         >
-          {game.players.map((p) => (
+          {dispPlayers.map((p) => (
             <Box
               key={p.id}
               ref={(el) => {
@@ -209,6 +284,7 @@ export default function GamePage() {
                 isBestOf={isBestOf}
                 sumMode={inputMode === 'sum'}
                 format={game.format}
+                avatar={gameAvatar(p)}
               />
             </Box>
           ))}
@@ -223,7 +299,7 @@ export default function GamePage() {
             gap: 2,
           }}
         >
-          {game.players.map((p) => (
+          {dispPlayers.map((p, idx) => (
             <PlayerCard
               key={p.id}
               player={p}
@@ -232,6 +308,8 @@ export default function GamePage() {
               sumMode={inputMode === 'sum'}
               scoreboard
               format={game.format}
+              avatar={gameAvatar(p)}
+              avatarSide={game.players.length === 2 ? (idx === 0 ? 'right' : 'left') : 'left'}
             />
           ))}
         </Box>
@@ -253,38 +331,68 @@ export default function GamePage() {
           />
         ) : inputMode === 'board' ? (
           <BoardInput
-            onThrow={throwDart}
-            onMisses={throwMisses}
-            dartsThisTurn={current && current.currentTurn ? current.currentTurn.length : 0}
-            onUndo={undo}
-            canUndo={game.canUndo}
+            onThrow={handleThrow}
+            onMisses={handleMisses}
+            dartsThisTurn={dartsThisTurn}
+            onUndo={handleUndo}
+            canUndo={game.canUndo || pending.length > 0}
             disabled={botTurn || finished || game.awaitingBullOff}
           />
         ) : (
           <Numpad
-            onThrow={throwDart}
-            onMisses={throwMisses}
-            dartsThisTurn={current && current.currentTurn ? current.currentTurn.length : 0}
-            onUndo={undo}
-            canUndo={game.canUndo}
+            onThrow={handleThrow}
+            onMisses={handleMisses}
+            dartsThisTurn={dartsThisTurn}
+            onUndo={handleUndo}
+            canUndo={game.canUndo || pending.length > 0}
             disabled={botTurn || finished || game.awaitingBullOff}
           />
         )}
       </Box>
 
-      <Dialog open={askAbort} onClose={() => setAskAbort(false)}>
-        <DialogTitle>{t('game.abortQ')}</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {game.tournamentId ? t('game.abortTournamentText') : t('game.abortText')}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAskAbort(false)}>{t('game.continue')}</Button>
-          <Button color="error" variant="contained" onClick={abort}>
-            {t('game.abort')}
-          </Button>
-        </DialogActions>
+      <Dialog open={askAbort} onClose={() => { setAskAbort(false); setSurrenderPick(false); }}>
+        {surrenderPick ? (
+          <>
+            <DialogTitle>{t('game.surrenderQ')}</DialogTitle>
+            <DialogContent>
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {game.players.map((p) => (
+                  <Button
+                    key={p.id}
+                    variant="outlined"
+                    size="large"
+                    onClick={() => {
+                      surrender(p.id);
+                      setSurrenderPick(false);
+                      setAskAbort(false);
+                    }}
+                  >
+                    {p.name}
+                  </Button>
+                ))}
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setSurrenderPick(false)}>{t('game.continue')}</Button>
+            </DialogActions>
+          </>
+        ) : (
+          <>
+            <DialogTitle>{t('game.abortQ')}</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                {game.tournamentId ? t('game.abortTournamentText') : t('game.abortText')}
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions sx={{ flexWrap: 'wrap' }}>
+              <Button onClick={() => setAskAbort(false)}>{t('game.continue')}</Button>
+              <Button onClick={() => setSurrenderPick(true)}>{t('game.surrenderBtn')}</Button>
+              <Button color="error" variant="contained" onClick={abort}>
+                {t('game.abort')}
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
 
       <Dialog open={askFinish} onClose={() => setAskFinish(false)}>
@@ -310,9 +418,14 @@ export default function GamePage() {
           </Typography>
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center' }}>
-          <DialogContentText sx={{ mb: 2 }}>
+          <DialogContentText sx={{ mb: game.bullOffTarget ? 1 : 2 }}>
             {t('game.ausbullenText', { n: game.maxRounds })}
           </DialogContentText>
+          {game.bullOffTarget ? (
+            <Typography sx={{ mb: 2, fontWeight: 800, fontSize: 22, color: ACCENT.undo }}>
+              {t('game.ausbullenField', { field: game.bullOffTarget })}
+            </Typography>
+          ) : null}
           <Stack spacing={1}>
             {game.players.map((p) => (
               <Button key={p.id} variant="outlined" size="large" onClick={() => bullOff(p.id)}>
@@ -347,9 +460,17 @@ export default function GamePage() {
                     {e.playerName}
                   </Typography>
                   <Stack direction="row" spacing={0.5} justifyContent="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
-                    {e.items.map((a) => (
-                      <Chip key={a.id} size="small" label={`${a.icon} ${lang === 'de' ? a.name : a.nameEn}`} />
-                    ))}
+                    {e.items.map((a) => {
+                      const nm = lang === 'de' ? a.name : a.nameEn;
+                      const label = a.field
+                        ? `${a.icon} ${nm} (${a.field === 25 ? 'Bull' : a.field})`
+                        : `${a.icon} ${nm}`;
+                      return (
+                        <Tooltip key={a.id} title={(lang === 'de' ? a.desc : a.descEn) || ''} arrow>
+                          <Chip size="small" label={label} />
+                        </Tooltip>
+                      );
+                    })}
                   </Stack>
                 </Box>
               ))}

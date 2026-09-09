@@ -31,7 +31,7 @@ export function makeHuman(name = '') {
   return { key: nextKey(), id: undefined, name, type: 'human', botLevel: null, checkoutMode: 'double', dartId: null };
 }
 export function makeBot(level = 'medium', push = false) {
-  const labels = { easy: 'Easy Bot', medium: 'Medium Bot', hard: 'Hard Bot', adaptive: 'Adaptiv Bot' };
+  const labels = { easy: 'Easy Bot', easyplus: 'Anfänger+ Bot', medium: 'Medium Bot', hard: 'Hard Bot', adaptive: 'Adaptiv Bot' };
   return {
     key: nextKey(),
     id: undefined,
@@ -49,7 +49,7 @@ export function makeBot(level = 'medium', push = false) {
  * inkl. Bearbeiten per Stift mit Persistierung), Bots, Checkout-Modus, Entfernen.
  * @param {Function} onRename async (id, name) => void – benennt einen gespeicherten Spieler um
  */
-export default function PlayerSetupList({ players, setPlayers, savedPlayers = [], darts = [], onRename }) {
+export default function PlayerSetupList({ players, setPlayers, savedPlayers = [], darts = [], onRename, allowBots = true }) {
   const t = useT();
   const [botAnchor, setBotAnchor] = useState(null);
   const [editKey, setEditKey] = useState(null);
@@ -94,17 +94,20 @@ export default function PlayerSetupList({ players, setPlayers, savedPlayers = []
         >
           {t('psl.player')}
         </Button>
-        <Button
-          variant="contained"
-          color="warning"
-          startIcon={<SmartToyIcon />}
-          onClick={(e) => setBotAnchor(e.currentTarget)}
-          fullWidth
-        >
-          {t('psl.bot')}
-        </Button>
+        {allowBots && (
+          <Button
+            variant="contained"
+            color="warning"
+            startIcon={<SmartToyIcon />}
+            onClick={(e) => setBotAnchor(e.currentTarget)}
+            fullWidth
+          >
+            {t('psl.bot')}
+          </Button>
+        )}
         <Menu anchorEl={botAnchor} open={Boolean(botAnchor)} onClose={() => setBotAnchor(null)}>
           <MenuItem onClick={() => addBot('easy')}>{t('psl.easyBot')}</MenuItem>
+          <MenuItem onClick={() => addBot('easyplus')}>{t('psl.easyplusBot')}</MenuItem>
           <MenuItem onClick={() => addBot('medium')}>{t('psl.mediumBot')}</MenuItem>
           <MenuItem onClick={() => addBot('hard')}>{t('psl.hardBot')}</MenuItem>
           <MenuItem onClick={() => addBot('adaptive', false)}>{t('psl.adaptiveFair')}</MenuItem>

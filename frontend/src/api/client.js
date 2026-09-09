@@ -32,6 +32,7 @@ export const api = {
     request(`/players/${id}/profile`, { method: 'PUT', body: JSON.stringify(body) }),
   getCoach: (id) => request(`/players/${id}/coach`),
   getPlayerAchievements: (id) => request(`/players/${id}/achievements`),
+  getCheckoutTable: (id) => request(`/players/${id}/checkout-table`),
   createPlayer: (body) => request('/players', { method: 'POST', body: JSON.stringify(body) }),
   updatePlayer: (id, body) =>
     request(`/players/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -42,12 +43,16 @@ export const api = {
   listGames: () => request('/games'),
   throwDart: (id, dart) =>
     request(`/games/${id}/throw`, { method: 'POST', body: JSON.stringify(dart) }),
+  throwTurn: (id, darts) =>
+    request(`/games/${id}/turn`, { method: 'POST', body: JSON.stringify({ darts }) }),
   submitVisit: (id, sum, checkoutDarts) =>
     request(`/games/${id}/visit`, {
       method: 'POST',
       body: JSON.stringify(checkoutDarts != null ? { sum, checkoutDarts } : { sum }),
     }),
   finishGame: (id) => request(`/games/${id}/finish`, { method: 'POST' }),
+  surrender: (id, unitId) =>
+    request(`/games/${id}/surrender`, { method: 'POST', body: JSON.stringify({ unitId }) }),
   botTurn: (id) => request(`/games/${id}/bot-turn`, { method: 'POST' }),
   undo: (id) => request(`/games/${id}/undo`, { method: 'POST' }),
   bullOff: (id, winnerId) =>
@@ -71,6 +76,8 @@ export const api = {
   getPlayerStats: (id, range = 'all', area = 'game', dartId = null) =>
     request(`/stats/${id}?range=${range}&area=${area}${dartId != null ? `&dart=${dartId}` : ''}`),
   playerDarts: (id, area = 'game') => request(`/stats/${id}/darts?area=${area}`),
+  dartRecommendations: () => request('/stats/dart-recommendations'),
+  dartPlayers: (dartId) => request(`/stats/dart/${dartId}/players`),
   playerSectors: (id, area = 'game', range = 'all') =>
     request(`/stats/${id}/sectors?area=${area}&range=${range}`),
   playerTimeline: (id, range = 'all', area = 'game', dartId = null) =>
@@ -81,6 +88,26 @@ export const api = {
     request(`/matches?range=${range}&area=${area}${player != null ? `&player=${player}` : ''}`),
   getMatch: (id) => request(`/matches/${id}`),
   headToHead: (a, b) => request(`/matches/h2h?a=${a}&b=${b}`),
+
+  // Ranglisten & Ligen (Stufe 7: Elo, Saisons/Tabellen)
+  listRatings: (range = 'all', bots = true) => request(`/ratings?range=${range}&bots=${bots ? 1 : 0}`),
+  getPlayerRating: (id) => request(`/ratings/${id}`),
+  listLeagues: () => request('/leagues'),
+  createLeague: (body) => request('/leagues', { method: 'POST', body: JSON.stringify(body) }),
+  getLeague: (id) => request(`/leagues/${id}`),
+  addLeagueMember: (id, playerId) =>
+    request(`/leagues/${id}/members`, { method: 'POST', body: JSON.stringify({ playerId }) }),
+  removeLeagueMember: (id, playerId) => request(`/leagues/${id}/members/${playerId}`, { method: 'DELETE' }),
+  setLeagueStatus: (id, status) =>
+    request(`/leagues/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+  deleteLeague: (id) => request(`/leagues/${id}`, { method: 'DELETE' }),
+
+  // Party-Spiele (Stufe 4: Killer/Baseball/Golf)
+  createParty: (body) => request('/party', { method: 'POST', body: JSON.stringify(body) }),
+  getParty: (id) => request(`/party/${id}`),
+  throwParty: (id, dart) => request(`/party/${id}/throw`, { method: 'POST', body: JSON.stringify(dart) }),
+  undoParty: (id) => request(`/party/${id}/undo`, { method: 'POST' }),
+  deleteParty: (id) => request(`/party/${id}`, { method: 'DELETE' }),
 
   // Achievements (Katalog + wer hat sie erreicht)
   getAchievements: () => request('/achievements'),

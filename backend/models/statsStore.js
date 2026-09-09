@@ -327,11 +327,58 @@ function winStreak(playerId) {
   return nWins;
 }
 
+// Niederlagen-Serien (aktuell, maximal, und ob die letzte Serie ≥5 mit einem Sieg gebrochen wurde).
+function lossStats(playerId) {
+  const rows = q('SELECT won FROM game_stats WHERE player_id = ? AND is_training = 0 ORDER BY finished_at DESC').all(Number(playerId));
+  let cur = 0;
+  for (const r of rows) {
+    if (!r.won) cur += 1;
+    else break;
+  }
+  let max = 0;
+  let run = 0;
+  for (const r of rows) {
+    if (!r.won) {
+      run += 1;
+      if (run > max) max = run;
+    } else {
+      run = 0;
+    }
+  }
+  const broke5 = rows.length >= 6 && rows[0].won === 1 && rows.slice(1, 6).every((r) => !r.won);
+  return { cur, max, broke5 };
+}
+function bigFishCount(playerId) {
+  return q('SELECT COUNT(*) AS c FROM game_stats WHERE player_id = ? AND is_training = 0 AND max_checkout >= 170').get(Number(playerId)).c;
+}
+function checkoutsTotal(playerId) {
+  return q('SELECT COALESCE(SUM(checkouts),0) AS c FROM game_stats WHERE player_id = ? AND is_training = 0').get(Number(playerId)).c;
+}
+// Serie aufeinanderfolgender Matches mit 90+ Average (neueste zuerst).
+function avg90Streak(playerId) {
+  const rows = q('SELECT points, darts FROM game_stats WHERE player_id = ? AND is_training = 0 ORDER BY finished_at DESC').all(Number(playerId));
+  let n = 0;
+  for (const r of rows) {
+    const a = r.darts ? (r.points / r.darts) * 3 : 0;
+    if (a >= 90) n += 1;
+    else break;
+  }
+  return n;
+}
+
 function get(playerId, range = 'all', { training = false, dartId = null } = {}) {
   const id = Number(playerId);
   const found = query({ range, training, dartId, playerId: id })[0];
   if (found) {
     found.winStreak = winStreak(id);
+    found.losses = Math.max(0, (found.games || 0) - (found.wins || 0));
+    const ls = lossStats(id);
+    found.lossStreak = ls.cur;
+    found.lossStreakMax = ls.max;
+    found.brokeLoss5 = ls.broke5;
+    found.bigFishCount = bigFishCount(id);
+    found.checkoutsTotal = checkoutsTotal(id);
+    found.avg90Streak = avg90Streak(id);
     return found;
   }
   const p = playerStore.get(id);
@@ -513,4 +560,47 @@ function playDayStreak(playerId) {
   return streakFromDates(rows.map((r) => r.d));
 }
 
-module.exports = { recordGameResult, recordTrainingScoring, list, get, timeline, playerDarts, playerSectorsByDart, playDayStreak };
+// Empfohlener Pfeil je (menschlichem) Spieler: der Pfeil mit dem höchsten Average.
+// Pfeile mit mind. 2 Spielen werden bevorzugt, um Einzel-Ausreißer zu vermeiden.
+function dartRecommendations() {
+  const rows = q(`
+    SELECT gs.player_id AS pid, p.name AS pname, gs.dart_id AS did, d.name AS dname,
+           COUNT(*) AS games, SUM(gs.points) AS pts, SUM(gs.darts) AS drt
+    FROM game_stats gs
+    JOIN players p ON p.id = gs.player_id
+    LEFT JOIN darts d ON d.id = gs.dart_id
+    WHERE gs.is_training = 0 AND p.type = 'human' AND gs.dart_id IS NOT NULL
+    GROUP BY gs.player_id, gs.dart_id
+  `).all();
+  const byPlayer = new Map();
+  for (const r of rows) {
+    const rec = { dartId: r.did, dartName: r.dname || `Pfeil ${r.did}`, games: r.games, average: avg3(r.pts, r.drt) };
+    const cur = byPlayer.get(r.pid) || { playerId: r.pid, name: r.pname, darts: [] };
+    cur.darts.push(rec);
+    byPlayer.set(r.pid, cur);
+  }
+  const out = [];
+  for (const p of byPlayer.values()) {
+    const eligible = p.darts.filter((x) => x.games >= 2);
+    const pool = (eligible.length ? eligible : p.darts).slice().sort((a, b) => b.average - a.average);
+    const best = pool[0];
+    out.push({ playerId: p.playerId, name: p.name, dartId: best.dartId, dartName: best.dartName, average: best.average, games: best.games });
+  }
+  return out.sort((a, b) => b.average - a.average);
+}
+
+// Spieler, die einen bestimmten Pfeil gespielt haben, mit ihrem Average damit.
+function playersForDart(dartId) {
+  const rows = q(`
+    SELECT gs.player_id AS pid, p.name AS pname, COUNT(*) AS games, SUM(gs.points) AS pts, SUM(gs.darts) AS drt
+    FROM game_stats gs
+    JOIN players p ON p.id = gs.player_id
+    WHERE gs.is_training = 0 AND gs.dart_id = ?
+    GROUP BY gs.player_id
+  `).all(Number(dartId));
+  return rows
+    .map((r) => ({ playerId: r.pid, name: r.pname, games: r.games, average: avg3(r.pts, r.drt) }))
+    .sort((a, b) => b.average - a.average);
+}
+
+module.exports = { recordGameResult, recordTrainingScoring, list, get, timeline, playerDarts, playerSectorsByDart, playDayStreak, dartRecommendations, playersForDart };

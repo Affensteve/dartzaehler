@@ -63,7 +63,8 @@ export default function useMatchSound(game, { announceOnEnter = false, onComment
             playEffect('leg');
             sayCueWithName(name || null, 'game-shot', pref);
             const co = finisher ? finisher.lastVisitScore : 0;
-            if (co >= 60) emit('checkout', { name, score: co });
+            if (co >= 100) emit('bigco', { name, score: co });
+            else if (co >= 60) emit('checkout', { name, score: co });
           } else if (game.message === 'BUST') {
             playEffect('bust');
             callCue('no-score', pref);
@@ -84,13 +85,18 @@ export default function useMatchSound(game, { announceOnEnter = false, onComment
           const sc = finisher ? finisher.lastVisitScore : 0;
           if (sc > 0) sayScore(sc, pref);
           if (sc === 180) emit('s180', { name });
+          else if (sc >= 140) emit('s140', { name, score: sc });
           else if (sc >= 100) emit('big', { name, score: sc });
+        }
+      }
 
-          // Finish-Ansage im Spiel gegen Bots: „Name, you require XX",
-          // sobald der eben werfende Spieler auf einem Finish steht.
-          const vsBot = game.players.some((pl) => pl.type === 'bot');
-          const rem = finisher ? finisher.score : 0;
-          if (vsBot && isFinishable(rem)) sayRequire(name, rem, pref);
+      // Rest-Ansage im Caller-Stil: sobald der neue Spieler aufgerufen wird und auf
+      // einem Finish steht („Name, you require XX"). Gilt für Spiel- und Cast-Ansicht,
+      // in allen Spielen. Nach dem Score/Checkout, damit die Reihenfolge stimmt.
+      if (game.status === 'playing' && game.currentPlayerIndex !== p.currentPlayerIndex) {
+        const upNext = game.players[game.currentPlayerIndex];
+        if (upNext && isFinishable(upNext.score)) {
+          sayRequire(upNext.activeMember || upNext.name, upNext.score, prefOf(upNext));
         }
       }
     }

@@ -61,13 +61,15 @@ function getPlayerDoubleProfile(playerId) {
   return profile;
 }
 
-// Doppel-Trefferquoten je Feld (nur mit genug Versuchen), beste zuerst –
-// für die Profilkarte (Lieblings-/Angst-Doppel).
-function getPlayerDoubleStats(playerId) {
+// Doppel-Trefferquoten je Feld (Anzeige-Schwelle niedriger als die strenge
+// Personalisierungs-Schwelle, damit auch früh die tatsächlich besten Doppel
+// sichtbar sind), beste zuerst – für Profilkarte und PDF-Bericht.
+const DISPLAY_MIN_ATTEMPTS = 3;
+function getPlayerDoubleStats(playerId, minAttempts = DISPLAY_MIN_ATTEMPTS) {
   const pooled = poolDoubles(Number(playerId));
   return Object.entries(pooled)
     .map(([label, { attempts, hits }]) => ({ label, attempts, hits, rate: attempts ? hits / attempts : 0 }))
-    .filter((d) => d.attempts >= PERSONALIZATION_MIN_ATTEMPTS)
+    .filter((d) => d.attempts >= minAttempts)
     .sort((a, b) => b.rate - a.rate);
 }
 

@@ -442,11 +442,11 @@ Aufwand). Details und der technische Stand stehen in [Projekt.md](Projekt.md).
 ### Stufe 3 – Statistik & Analyse (mittel)
 
 Vertiefte Kennzahlen & Vergleiche (Bestenlisten, Head-to-Head, Zeitraum-Vergleich, Checkout nach Rest-
-Bereichen inkl. „unter Druck“) und der PDF-Bericht sind umgesetzt (siehe *Funktionsumfang*). Offen bleibt:
+Bereichen inkl. „unter Druck“) und der PDF-Bericht sind umgesetzt (siehe *Funktionsumfang*).
 
-- **Trefferbild / Heatmap:** Eine dartboardförmige Heatmap der Treffer, die Stärken und Schwächen je
-  Segment auf einen Blick zeigt (wie bei Scolia/Dartist) – als Ergänzung zum bestehenden Sektor-Diagramm.
-  Sie kann später auch den PDF-Bericht ergänzen.
+- **Trefferbild / Heatmap (umgesetzt):** Eine dartboardförmige Heatmap der Treffer zeigt Stärken und
+  Schwächen je Segment auf einen Blick (wie bei Scolia/Dartist) – ergänzend zum Sektor-Diagramm. Enthalten
+  in der Spieler- und Trainingsstatistik (Schwächen-Heatmap) sowie im PDF-Bericht.
 
 ### Stufe 4 – Weitere Spielmodi (mittel)
 
@@ -457,12 +457,13 @@ vollwertige, mehrspielerfähige Wettkampfmodi (Vorbilder u. a. DartConnect, King
   abnehmen.
 - **Baseball & Golf:** 9 Innings auf die Felder 1–9 bzw. 18 „Löcher" mit möglichst wenigen Darts.
 - **Gotcha:** eine Zielpunktzahl exakt treffen (Überwerfen bestraft) – reizvolle Alternative zu X01.
-- **Shanghai / Around the Clock / Halve-it als Wettkampf:** die bereits vorhandenen Trainingsformen
-  zusätzlich als Mehrspieler-Match mit Wertung und Achievements.
+- **Shanghai / Around the Clock / Halve-it als Wettkampf (umgesetzt):** die Trainingsformen als
+  Mehrspieler-Match mit Wertung, Live-Cast und Achievements – im Party-Bereich spielbar.
 
 ### Stufe 5 – Turnier-Ausbau (mittel)
 
-- **Mehr Formate:** Mehr als zwei Gruppen, **Doppel-/Team-Turniere** (Teams als Einheit im Gruppen-/KO-Baum), Handicaps und Double-Elimination.
+- **Doppel-/Team-Turniere (umgesetzt):** Im „Neues Turnier" per Einzel/Doppel-Schalter; Teams sind eine Einheit im Gruppen- und KO-Baum, Tabellen/Setzung/Ergebnis-Sync funktionieren für Teams wie für Einzelspieler.
+- **Mehr Formate (offen):** Mehr als zwei Gruppen, Handicaps und Double-Elimination.
 - **Organisation:** Spielplan/Scheduling mit Board-Zuweisung sowie Druck-/Export der Turnierbäume und
   Ergebnislisten.
 
@@ -480,8 +481,10 @@ vollwertige, mehrspielerfähige Wettkampfmodi (Vorbilder u. a. DartConnect, King
   Mitverfolgen laufender Spiele/Turniere über das Cast-Format.
 - **Konten & Cloud-Sync:** Optionale Benutzerkonten mit geräteübergreifender Synchronisation von
   Statistik, Historie und Achievements.
-- **Ligen, Ranglisten & Elo:** Saisons/Ligen mit Tabellen, Elo-Rating (auch als Turnier-Setzung) und
-  weiter ausgebaute Achievement-/Abzeichen-Sammlung.
+- **Ligen, Ranglisten & Elo (umgesetzt, lokal):** Elo-Rating aus der Match-Historie (pro Match inkl.
+  Ergebnis-Höhe/Margin, feste Bot-Ratings je Level) mit eigener Rangliste, Saisons/Ligen inklusive
+  berechneter Tabelle (Punkte/Legs/Elo), Elo-Setzung im Turnier sowie zusätzliche Elo-Achievements.
+  Offen bleiben Online-Multiplayer, Zuschauer-Link und Cloud-Sync.
 
 ### Stufe 8 – Coaching & KI: generativ (groß)
 

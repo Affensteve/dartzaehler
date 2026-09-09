@@ -120,6 +120,13 @@ try {
   /* Spalte existiert bereits – ignorieren */
 }
 
+// Migration: Eigentümer eines Pfeil-Satzes (z. B. Gast bringt eigene Pfeile mit).
+try {
+  db.exec('ALTER TABLE darts ADD COLUMN owner TEXT');
+} catch (e) {
+  /* Spalte existiert bereits – ignorieren */
+}
+
 // Standard-Pfeil sicherstellen (Default 20 g) und allen Spielern ohne Pfeil zuweisen.
 const dartCount = db.prepare('SELECT COUNT(*) AS c FROM darts').get().c;
 if (dartCount === 0) {
@@ -152,6 +159,38 @@ db.exec(`CREATE TABLE IF NOT EXISTS saved_teams (
   members    TEXT    NOT NULL,
   created_at TEXT    DEFAULT (datetime('now'))
 )`);
+
+// Ligen/Saisons (Stufe 7): benannte Wettbewerbe mit Mitgliedern; die Tabelle wird
+// aus der Match-Historie (Spiele mit passender league_id) berechnet.
+db.exec(`CREATE TABLE IF NOT EXISTS leagues (
+  id         TEXT    PRIMARY KEY,
+  name       TEXT    NOT NULL,
+  status     TEXT    NOT NULL DEFAULT 'active',   -- 'active' | 'finished'
+  config     TEXT    NOT NULL DEFAULT '{}',        -- { mode, winPoints, ... }
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS league_members (
+  league_id TEXT    NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
+  player_id INTEGER NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  PRIMARY KEY (league_id, player_id)
+)`);
+
+// Party-Spiele (Stufe 4): eigener Spielstate, getrennt von X01-Spielen.
+db.exec(`CREATE TABLE IF NOT EXISTS party_games (
+  id         TEXT    PRIMARY KEY,
+  state      TEXT    NOT NULL,
+  status     TEXT    NOT NULL DEFAULT 'playing',
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+)`);
+
+// Migration: Match-Historie einer Liga/Saison zuordnen.
+try {
+  db.exec('ALTER TABLE match_history ADD COLUMN league_id TEXT');
+} catch (e) {
+  /* Spalte existiert bereits – ignorieren */
+}
+db.exec('CREATE INDEX IF NOT EXISTS idx_match_history_league ON match_history (league_id)');
 
 console.log(`[db] SQLite bereit: ${DB_PATH}`);
 

@@ -12,6 +12,10 @@ const TrainingPlayPage = lazy(() => import('./pages/TrainingPlayPage'));
 const TrainingBuilderPage = lazy(() => import('./pages/TrainingBuilderPage'));
 const DartsPage = lazy(() => import('./pages/DartsPage'));
 const VerwaltungPage = lazy(() => import('./pages/VerwaltungPage'));
+const AuswertungPage = lazy(() => import('./pages/AuswertungPage'));
+const PartyPage = lazy(() => import('./pages/PartyPage'));
+const PartyGamePage = lazy(() => import('./pages/PartyGamePage'));
+const PartyCastPage = lazy(() => import('./pages/PartyCastPage'));
 const CoachPage = lazy(() => import('./pages/CoachPage'));
 const GamePage = lazy(() => import('./pages/GamePage'));
 const TournamentSetupPage = lazy(() => import('./pages/TournamentSetupPage'));
@@ -24,6 +28,7 @@ const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 const MatchDetailPage = lazy(() => import('./pages/MatchDetailPage'));
 const AchievementsPage = lazy(() => import('./pages/AchievementsPage'));
+const LeaguesPage = lazy(() => import('./pages/LeaguesPage'));
 const CastListPage = lazy(() => import('./pages/CastListPage'));
 const CastPage = lazy(() => import('./pages/CastPage'));
 
@@ -47,6 +52,10 @@ export default function App() {
         <Route path="/training/builder" element={<TrainingBuilderPage />} />
         <Route path="/darts" element={<DartsPage />} />
         <Route path="/verwaltung" element={<VerwaltungPage />} />
+        <Route path="/auswertung" element={<AuswertungPage />} />
+        <Route path="/party" element={<PartyPage />} />
+        <Route path="/party/game/:id" element={<PartyGamePage />} />
+        <Route path="/party/cast/:id" element={<PartyCastPage />} />
         <Route path="/coach" element={<CoachPage />} />
         <Route path="/game/:id" element={<GamePage />} />
         <Route path="/tournament/new" element={<TournamentSetupPage />} />
@@ -59,6 +68,7 @@ export default function App() {
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/history/:id" element={<MatchDetailPage />} />
         <Route path="/achievements" element={<AchievementsPage />} />
+        <Route path="/leagues" element={<LeaguesPage />} />
         <Route path="/cast" element={<CastListPage />} />
         <Route path="/cast/:id" element={<CastPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

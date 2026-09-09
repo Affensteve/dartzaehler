@@ -2,10 +2,10 @@
 
 /** Kleine Eingabe-Validierer für die REST-API. */
 
-const MODES = [501, 301, 101];
+const MODES = [701, 601, 501, 301, 101];
 const CHECK_IN = ['straight', 'double'];
 const CHECKOUT = ['double', 'single', 'master'];
-const BOT_LEVELS = ['easy', 'medium', 'hard', 'adaptive'];
+const BOT_LEVELS = ['easy', 'easyplus', 'medium', 'hard', 'adaptive'];
 const SATZ_LEG = ['firstto', 'bestof', 'unlimited'];
 
 function sanitizePlayer(p) {
@@ -70,6 +70,9 @@ function sanitizeGameConfig(body) {
     players,
     teams,
     randomOrder: Boolean(body.randomOrder),
+    bullOffRandomField: Boolean(body.bullOffRandomField),
+    leagueId: typeof body.leagueId === 'string' && body.leagueId ? body.leagueId : null,
+    partyMode: typeof body.partyMode === 'string' && body.partyMode ? body.partyMode.slice(0, 20) : null,
   };
 }
 

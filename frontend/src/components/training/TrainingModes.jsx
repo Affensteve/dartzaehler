@@ -33,34 +33,52 @@ function NumField({ value, onChange, onEnter, label }) {
   );
 }
 
-// --- Around the Clock ---
+// --- Around the Clock (Richtung + Ring wählbar) ---
 function ClockMode({ onFinish, onProgress, initial }) {
-  const targets = [...Array(20)].map((_, i) => i + 1).concat(['Bull']);
+  const [dir, setDir] = useState(initial?.dir || 'up');
+  const [ring, setRing] = useState(initial?.ring || 'single');
   const [idx, setIdx] = useState(initial?.idx ?? 0);
   const [darts, setDarts] = useState(initial?.darts ?? 0);
-  const misses = useRef(initial?.missesByField || {}); // Fehlversuche je Feld
+  const misses = useRef(initial?.missesByField || {}); // Fehlwürfe je Feld
   const curMiss = useRef(initial?.curMiss || 0);
-  const cur = targets[idx];
-  useEffect(() => { onProgress && onProgress({ idx, darts, missesByField: misses.current, curMiss: curMiss.current }); });
-  const advance = (hit) => {
+  const base = dir === 'down' ? [...Array(20)].map((_, i) => 20 - i) : [...Array(20)].map((_, i) => i + 1);
+  const targets = ring === 'triple' ? base : [...base, 'Bull'];
+  const cur = targets[Math.min(idx, targets.length - 1)];
+  const started = darts > 0 || idx > 0;
+  useEffect(() => { onProgress && onProgress({ idx, darts, dir, ring, missesByField: misses.current, curMiss: curMiss.current }); });
+  const reset = () => { setIdx(0); setDarts(0); misses.current = {}; curMiss.current = 0; };
+  const label = cur === 'Bull' ? tr('tm.bull') : ring === 'double' ? 'D' + cur : ring === 'triple' ? 'T' + cur : String(cur);
+  const boardRing = cur === 'Bull' ? 'bull' : ring === 'double' ? 'double' : ring === 'triple' ? 'triple' : 'number';
+  const hitDart = () => {
     const d = darts + 1;
     setDarts(d);
-    if (hit) {
-      const field = cur === 'Bull' ? 'Bull' : String(cur);
-      misses.current[field] = curMiss.current;
-      curMiss.current = 0;
-      if (idx + 1 >= targets.length) onFinish({ score: d, detail: { darts: d, missesByField: { ...misses.current } } });
-      else setIdx(idx + 1);
-    } else {
-      curMiss.current += 1;
-    }
+    const field = cur === 'Bull' ? 'Bull' : String(cur);
+    misses.current[field] = (misses.current[field] || 0) + curMiss.current;
+    curMiss.current = 0;
+    if (idx + 1 >= targets.length) onFinish({ score: d, detail: { darts: d, dir, ring, missesByField: { ...misses.current } } });
+    else setIdx(idx + 1);
   };
+  // n Fehlwürfe auf einmal verbuchen (z. B. alle 3 Darts einer Aufnahme daneben).
+  const addMiss = (n) => { setDarts((d) => d + n); curMiss.current += n; };
   return (
-    <Stage title={tr('tm.target', { t: cur === 'Bull' ? tr('tm.bull') : cur })} sub={tr('tm.clockSub', { i: idx, d: darts })}
-      numbers={cur === 'Bull' ? [25] : [cur]} ring={cur === 'Bull' ? 'bull' : 'number'}>
-      <Stack direction="row" spacing={1}>
-        <Button variant="contained" size="large" onClick={() => advance(true)} sx={{ bgcolor: ACCENT.green, '&:hover': { bgcolor: ACCENT.green } }}>{tr('tm.hit')}</Button>
-        <Button variant="outlined" size="large" onClick={() => advance(false)}>{tr('tm.miss')}</Button>
+    <Stage title={tr('tm.target', { t: label })} sub={tr('tm.clockSub', { i: idx, d: darts })}
+      numbers={cur === 'Bull' ? [25] : [cur]} ring={boardRing}>
+      <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap" useFlexGap>
+        <ToggleButtonGroup exclusive size="small" value={dir} disabled={started} onChange={(e, v) => v && (reset(), setDir(v))}>
+          <ToggleButton value="up">{tr('tm.clockUp')}</ToggleButton>
+          <ToggleButton value="down">{tr('tm.clockDown')}</ToggleButton>
+        </ToggleButtonGroup>
+        <ToggleButtonGroup exclusive size="small" value={ring} disabled={started} onChange={(e, v) => v && (reset(), setRing(v))}>
+          <ToggleButton value="single">{tr('tm.ringSingle')}</ToggleButton>
+          <ToggleButton value="double">{tr('tm.ringDouble')}</ToggleButton>
+          <ToggleButton value="triple">{tr('tm.ringTriple')}</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+      <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap" useFlexGap>
+        <Button variant="contained" size="large" onClick={hitDart} sx={{ bgcolor: ACCENT.green, '&:hover': { bgcolor: ACCENT.green } }}>{tr('tm.hit')}</Button>
+        <Button variant="outlined" size="large" onClick={() => addMiss(1)}>{tr('tm.miss')}</Button>
+        <Button variant="outlined" size="large" onClick={() => addMiss(2)}>{tr('tm.miss2')}</Button>
+        <Button variant="outlined" size="large" onClick={() => addMiss(3)}>{tr('tm.miss3')}</Button>
       </Stack>
     </Stage>
   );
@@ -494,6 +512,33 @@ const ScoringHit19 = (p) => <ScoringHitMode target={19} {...p} />;
 const Scoring100 = (p) => <ScoringSumMode threshold={100} {...p} />;
 const Scoring140 = (p) => <ScoringSumMode threshold={140} {...p} />;
 
+// --- Triple-Rundlauf (T1 -> T20) ---
+function TriplesRoundMode({ onFinish, onProgress, initial }) {
+  const seq = [...Array(20)].map((_, i) => i + 1);
+  const [idx, setIdx] = useState(initial?.idx ?? 0);
+  const [hits, setHits] = useState(initial?.hits ?? 0);
+  const detail = useRef(initial?.detail || { hitsByTriple: {} });
+  useEffect(() => { onProgress && onProgress({ idx, hits, detail: detail.current }); });
+  const cur = seq[idx];
+  const pick = (h) => {
+    detail.current.hitsByTriple[String(cur)] = h;
+    const nh = hits + h;
+    if (idx + 1 >= seq.length) { onFinish({ score: nh, detail: { ...detail.current }, of: seq.length * 3 }); return; }
+    setHits(nh);
+    setIdx(idx + 1);
+  };
+  return (
+    <Stage title={`T${cur}`} sub={`${tr('tm.hitsTotal', { n: hits })} · ${tr('tm.roundOf', { r: idx + 1, n: seq.length })}`} numbers={[cur]} ring="triple">
+      <Typography variant="body2" color="text.secondary">{tr('tm.hitsThisRound')}</Typography>
+      <Stack direction="row" spacing={1}>
+        {[0, 1, 2, 3].map((h) => (
+          <Button key={h} variant={h === 0 ? 'outlined' : 'contained'} size="large" onClick={() => pick(h)} sx={{ minWidth: 56, fontWeight: 800 }}>{h}</Button>
+        ))}
+      </Stack>
+    </Stage>
+  );
+}
+
 export const MODE_COMPONENTS = {
   clock: ClockMode,
   bob27: Bob27Mode,
@@ -504,6 +549,7 @@ export const MODE_COMPONENTS = {
   checkout: CheckoutMode,
   checkoutdrill: CheckoutDrillMode,
   doublesround: DoublesRoundMode,
+  triplesround: TriplesRoundMode,
   bulltrain: BullTrainMode,
   drill20: ScoringHit20,
   drill19: ScoringHit19,

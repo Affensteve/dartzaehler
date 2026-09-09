@@ -404,7 +404,7 @@ export default function PlayersPage({ embedded = false }) {
   }
   return (
     <Box>
-      <Header title={t('pl.title')} onBack={() => navigate('/')} />
+      <Header title={t('pl.title')} onBack={() => navigate('/verwaltung')} />
       <Container maxWidth="sm" sx={{ py: 3 }}>
         {inner}
       </Container>

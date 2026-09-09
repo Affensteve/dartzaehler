@@ -6,8 +6,11 @@ const { BOT_LEVELS } = require('../utils/validators');
 const coach = require('../utils/coach');
 const achievementStore = require('../models/achievementStore');
 const doubleProfile = require('../utils/doubleProfile');
+const tripleProfile = require('../utils/tripleProfile');
+const rules = require('../utils/dartRules');
 const statsStore = require('../models/statsStore');
 const trainingStore = require('../models/trainingStore');
+const matchHistoryStore = require('../models/matchHistoryStore');
 const { catalog: achCatalog, progressFor } = require('../utils/achievements');
 const ACH_MAP = new Map(achCatalog().map((a) => [a.id, a]));
 
@@ -50,7 +53,14 @@ router.get('/:id/achievements', (req, res) => {
   const earned = earnedRows
     .map((r) => {
       const a = ACH_MAP.get(r.id);
-      return a ? { id: a.id, cat: a.cat, name: a.name, nameEn: a.nameEn, icon: a.icon, earnedAt: r.earnedAt } : null;
+      if (!a) return null;
+      const item = { id: a.id, cat: a.cat, name: a.name, nameEn: a.nameEn, icon: a.icon, earnedAt: r.earnedAt };
+      // Feld-Detail rückwirkend aus der Historie (z. B. „Shanghai (5)").
+      if (a.id === 'shanghai-live') {
+        const field = matchHistoryStore.shanghaiFieldForPlayer(id);
+        if (field) item.field = field;
+      }
+      return item;
     })
     .filter(Boolean);
 
@@ -73,6 +83,35 @@ router.get('/:id/achievements', (req, res) => {
     .sort((a, b) => b.pct - a.pct);
 
   res.json({ earned, progress });
+});
+
+// GET /api/players/:id/checkout-table – persönliche Checkout-Tabelle: je Rest die
+// Standard-Route und – falls ein gemessenes Doppel-Profil vorliegt – die auf den
+// persönlich besten Doppeln basierende Route. deviates=true, wenn beide abweichen.
+router.get('/:id/checkout-table', (req, res) => {
+  const id = Number(req.params.id);
+  const p = playerStore.get(id);
+  if (!p) return res.status(404).json({ error: 'Spieler nicht gefunden.' });
+  const mode = ['single', 'master'].includes(p.checkoutMode) ? p.checkoutMode : 'double';
+  const profile = doubleProfile.getPlayerDoubleProfile(id) || {};
+  const tprofile = tripleProfile.getPlayerTripleProfile(id) || {};
+  const hasProfile = Object.keys(profile).length > 0 || Object.keys(tprofile).length > 0;
+  const rows = [];
+  for (let rest = 170; rest >= 2; rest--) {
+    const std = rules.findCheckout(rest, mode, 3);
+    if (!std) continue;
+    let personal = std;
+    let deviates = false;
+    if (hasProfile) {
+      const pers = rules.findPersonalizedCheckout(rest, mode, profile, 3, tprofile);
+      if (pers && pers.route) {
+        personal = pers.route;
+        deviates = pers.route.join(' ') !== std.join(' ');
+      }
+    }
+    rows.push({ rest, standard: std, personal, deviates });
+  }
+  res.json({ mode, hasProfile, rows });
 });
 
 // POST /api/players – neuen Spieler anlegen

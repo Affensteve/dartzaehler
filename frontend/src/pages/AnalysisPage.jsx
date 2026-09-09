@@ -44,7 +44,7 @@ export default function AnalysisPage() {
 
   return (
     <Box>
-      <Header title={t('an.title')} onBack={() => navigate('/verwaltung')} />
+      <Header title={t('an.title')} onBack={() => navigate('/auswertung')} />
       <Container maxWidth="md" sx={{ py: 2 }}>
         <Tabs value={tab} onChange={(e, v) => setTab(v)} variant="fullWidth" sx={{ mb: 2 }}>
           <Tab value="leaderboard" label={t('an.leaderboard')} />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -32,8 +32,10 @@ export default function CoachPage() {
   const navigate = useNavigate();
   const t = useT();
   const lang = useLang();
+  const [searchParams] = useSearchParams();
   const [players, setPlayers] = useState([]);
-  const [pid, setPid] = useState('');
+  // Vorauswahl aus der Auswertung (?player=…) übernehmen.
+  const [pid, setPid] = useState(searchParams.get('player') || '');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

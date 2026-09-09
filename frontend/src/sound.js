@@ -4,7 +4,7 @@
 // in localStorage. Sprache/Stimme lassen sich zusätzlich je Spieler übergeben.
 
 const KEY = 'dz.sound';
-const defaults = { enabled: true, voice: true, volume: 0.7, mode: 'generated', lang: 'en', gender: 'female', voiceByLang: {}, commentary: false };
+const defaults = { enabled: true, voice: true, volume: 0.7, mode: 'generated', lang: 'en', gender: 'female', voiceByLang: {}, commentary: false, avatarsInGame: false, checkoutCall: true, batchScoring: true };
 
 function load() {
   try {
@@ -269,7 +269,7 @@ export function sayCueWithName(name, cueName, pref) {
 // Finish-Ansage im Stil des Callers: „Name, you require XX" / „Name benötigt noch XX".
 // Wird als Aufnahme in die Warteschlange gehängt (kein Abbruch).
 export function sayRequire(name, score, pref) {
-  if (!settings.enabled || !settings.voice || !score) return;
+  if (!settings.enabled || !settings.voice || !settings.checkoutCall || !score) return;
   const lang = (pref && pref.lang) || settings.lang;
   const gender = (pref && pref.gender) || settings.gender;
   const voiceURI = pref ? undefined : settings.voiceByLang[lang];
