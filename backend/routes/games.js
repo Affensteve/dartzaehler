@@ -136,8 +136,21 @@ router.post('/', (req, res) => {
 });
 
 // GET /api/games
+// Liefert die interne Spieleliste UND (für den Darterkenner) die Felder
+// gameId/mode(string)/status(waiting|active)/players[{id,name,score}]/createdAt.
+// Beendete Spiele erscheinen nicht (Darterkenner-Anforderung).
 router.get('/', (req, res) => {
-  res.json(gameStore.list());
+  const list = gameStore.list()
+    .filter((g) => g.status !== 'finished')
+    .map((g) => ({
+      ...g,
+      gameId: g.id,
+      mode: g.mode != null ? String(g.mode) : null,
+      status: g.status === 'playing' ? 'active' : 'waiting',
+      players: Array.isArray(g.playerObjs) && g.playerObjs.length ? g.playerObjs : g.players,
+      createdAt: g.createdAt,
+    }));
+  res.json(list);
 });
 
 // GET /api/games/:id/stream – SSE

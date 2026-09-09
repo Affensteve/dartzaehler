@@ -17,7 +17,7 @@ export default function CastListPage() {
     api.listGames().then(setGames).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const running = games.filter((g) => g.status === 'playing');
+  const running = games.filter((g) => g.status === 'playing' || g.status === 'active');
 
   return (
     <Box>
@@ -42,7 +42,7 @@ export default function CastListPage() {
                   <ListItemButton onClick={() => navigate(`/cast/${g.id}`)}>
                     <CastIcon sx={{ mr: 1.5, color: 'text.secondary' }} />
                     <ListItemText
-                      primary={`${g.tournamentId ? t('cast.match') : t('cast.game')} ${g.players && g.players.length ? g.players.join(' : ') : g.id.slice(0, 8)}`}
+                      primary={`${g.tournamentId ? t('cast.match') : t('cast.game')} ${(() => { const n = (g.players || []).map((p) => (typeof p === 'string' ? p : p && p.name)).filter(Boolean); return n.length ? n.join(' : ') : g.id.slice(0, 8); })()}`}
                       secondary={gameLabel({ mode: g.mode, format: g.format, checkout: g.checkout }) || g.updatedAt}
                     />
                     <Chip size="small" color="success" label={t('home.running')} />

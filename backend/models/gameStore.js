@@ -67,7 +67,13 @@ function buildMeta(game) {
       ? { satzLegMode: game.format.satzLegMode, sets: game.format.sets, legs: game.format.legs }
       : null,
     checkout: modeSet.size > 1 ? 'mixed' : [...modeSet][0] || 'double',
-    players: pls.map((p) => ({ dbId: Number.isInteger(p.dbId) ? p.dbId : null, name: p.name })),
+    // id/score zusätzlich für die Darterkenner-Integration (GET /api/games).
+    players: pls.map((p) => ({
+      id: p.id ?? null,
+      dbId: Number.isInteger(p.dbId) ? p.dbId : null,
+      name: p.name,
+      score: Number.isFinite(p.score) ? p.score : null,
+    })),
   };
 }
 
@@ -112,6 +118,7 @@ function get(id) {
 function list() {
   return listStmt.all().map((r) => {
     let players = [];
+    let playerObjs = [];
     let label = null;
     let mode = null;
     let format = null;
@@ -122,9 +129,16 @@ function list() {
       label = m.label || null;
       format = m.format || null;
       checkout = m.checkout || 'double';
-      players = (m.players || []).map((p) =>
+      const raw = m.players || [];
+      players = raw.map((p) =>
         Number.isInteger(p.dbId) ? playerStore.displayName(p.dbId, p.name) : p.name
       );
+      // Objekt-Form (id/name/score) für die Darterkenner-Integration.
+      playerObjs = raw.map((p) => ({
+        id: p.id ?? null,
+        name: Number.isInteger(p.dbId) ? playerStore.displayName(p.dbId, p.name) : p.name,
+        score: Number.isFinite(p.score) ? p.score : null,
+      }));
     } catch (e) {
       /* defekte meta ignorieren */
     }
@@ -135,6 +149,7 @@ function list() {
       createdAt: r.created_at,
       updatedAt: r.updated_at,
       players,
+      playerObjs,
       label,
       mode,
       format,

@@ -53,7 +53,15 @@ app.use('/api/ratings', require('./routes/ratings'));
 app.use('/api/leagues', require('./routes/leagues'));
 app.use('/api/party', require('./routes/party'));
 
-app.get('/api/health', (req, res) => res.json({ ok: true, version: '1.0.0' }));
+app.get('/api/health', (req, res) =>
+  res.json({ status: 'ok', ok: true, version: '1.0.0', timestamp: new Date().toISOString() })
+);
+
+// --- Darterkenner-Integration (HTTP-Client, Port 3001) ---
+// Endpunkte: /api/game-context, /api/round-complete, /api/bulls-out,
+// /api/detected-throws/:id, /api/board-calibration, /api/ml-models/latest.
+// (GET /api/games ist um die Darterkenner-Felder erweitert – s. routes/games.js.)
+app.use('/api', require('./routes/integration'));
 
 // --- Statisches Frontend (Vite-Build) ---
 const distDir = path.join(__dirname, '..', 'frontend', 'dist');

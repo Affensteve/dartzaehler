@@ -67,11 +67,17 @@ export default function HomePage() {
     reload();
   };
 
-  const openGames = games.filter((g) => g.status === 'playing' && !g.tournamentId).slice(0, 8);
+  const openGames = games
+    .filter((g) => (g.status === 'playing' || g.status === 'active') && !g.tournamentId)
+    .slice(0, 8);
   const activeTournaments = tournaments.filter((t2) => t2.status === 'active').slice(0, 8);
 
-  const gameTitle = (g) =>
-    g.players && g.players.length ? `${t('home.game')} ${g.players.join(' : ')}` : `${t('home.game')} ${g.id.slice(0, 8)}`;
+  const playerNames = (g) =>
+    (g.players || []).map((p) => (typeof p === 'string' ? p : p && p.name)).filter(Boolean);
+  const gameTitle = (g) => {
+    const names = playerNames(g);
+    return names.length ? `${t('home.game')} ${names.join(' : ')}` : `${t('home.game')} ${g.id.slice(0, 8)}`;
+  };
 
   const primary = { icon: <SportsIcon />, label: t('home.newGame'), to: '/setup', color: '#006EC7' };
   const NAV = [
