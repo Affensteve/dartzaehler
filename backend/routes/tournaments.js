@@ -10,6 +10,7 @@ const tlogic = require('../utils/tournamentLogic');
 const bracket = require('../utils/tournamentBracket');
 const tview = require('../utils/tournamentView');
 const gameEvents = require('../utils/gameEvents');
+const ratingStore = require('../models/ratingStore');
 const { sanitizePlayer } = require('../utils/validators');
 
 const router = express.Router();
@@ -30,17 +31,52 @@ function phaseFormat(src, base) {
 router.post('/', (req, res) => {
   try {
     const body = req.body || {};
-    const players = (Array.isArray(body.players) ? body.players : [])
-      .map(sanitizePlayer)
-      .map((p) => {
-        let dbId = Number.isInteger(p.id) && playerStore.get(p.id) ? p.id : null;
-        if (p.type === 'bot') dbId = playerStore.ensureBot(p.name, p.botLevel).id;
-        // Pfeil-Auswahl wie der Checkout-Modus persistieren.
-        if (dbId && p.type !== 'bot' && Number.isInteger(p.dartId)) playerStore.setDart(dbId, p.dartId);
-        return { ...p, id: p.id || randomUUID(), dbId };
-      });
-    if (players.length < 2) {
-      return res.status(400).json({ error: 'Ein Turnier benötigt mindestens 2 Spieler.' });
+    // Teilnehmer-Einheiten: entweder Einzelspieler oder Teams (Doppel-Turnier).
+    const isTeams = Array.isArray(body.teams) && body.teams.length >= 2;
+    let players;
+    if (isTeams) {
+      players = body.teams
+        .map((tm) => {
+          const members = (Array.isArray(tm.members) ? tm.members : [])
+            .map((mp) => ({ src: mp, sp: sanitizePlayer({ ...mp, type: 'human' }) }))
+            .map(({ src, sp }) => {
+              let dbId = Number.isInteger(src.id) && playerStore.get(src.id) ? src.id : null;
+              if (!dbId && sp.name) dbId = playerStore.create({ name: sp.name, type: 'human' }).id;
+              if (dbId && Number.isInteger(src.dartId)) playerStore.setDart(dbId, src.dartId);
+              return { id: dbId, dbId, name: sp.name, dartId: Number.isInteger(src.dartId) ? src.dartId : null, checkoutMode: sp.checkoutMode };
+            })
+            .filter((m) => m.name && m.dbId != null);
+          return {
+            id: randomUUID(),
+            type: 'team',
+            name: (tm.name && String(tm.name).trim()) || members.map((m) => m.name).join(' & '),
+            color: typeof tm.color === 'string' ? tm.color.slice(0, 20) : null,
+            checkoutMode: ['single', 'master', 'individual', 'double'].includes(tm.checkoutMode) ? tm.checkoutMode : 'double',
+            members,
+          };
+        })
+        .filter((u) => u.members.length >= 1);
+      if (players.length < 2) {
+        return res.status(400).json({ error: 'Ein Doppel-Turnier benötigt mindestens 2 Teams.' });
+      }
+    } else {
+      players = (Array.isArray(body.players) ? body.players : [])
+        .map(sanitizePlayer)
+        .map((p) => {
+          let dbId = Number.isInteger(p.id) && playerStore.get(p.id) ? p.id : null;
+          if (p.type === 'bot') dbId = playerStore.ensureBot(p.name, p.botLevel).id;
+          // Pfeil-Auswahl wie der Checkout-Modus persistieren.
+          if (dbId && p.type !== 'bot' && Number.isInteger(p.dartId)) playerStore.setDart(dbId, p.dartId);
+          return { ...p, id: p.id || randomUUID(), dbId };
+        });
+      if (players.length < 2) {
+        return res.status(400).json({ error: 'Ein Turnier benötigt mindestens 2 Spieler.' });
+      }
+      // Setzung nach Elo: stärkste Spieler zuerst, damit assignGroups/Bracket sie trennt.
+      if (body.seedByElo) {
+        const ratings = ratingStore.ratingMap();
+        players.sort((a, b) => (ratings[b.dbId] ?? ratingStore.START_ELO) - (ratings[a.dbId] ?? ratingStore.START_ELO));
+      }
     }
 
     const groupCount = Number(body.groupCount) === 2 && players.length >= 4 ? 2 : 1;
@@ -60,6 +96,7 @@ router.post('/', (req, res) => {
       inputMode: body.inputMode === 'sum' ? 'sum' : 'numpad',
       maxRounds:
         body.maxRounds == null ? 20 : Math.min(Math.max(parseInt(body.maxRounds, 10) || 0, 0), 99),
+      bullOffRandomField: Boolean(body.bullOffRandomField),
       groupCount,
       ko: { enabled: koEnabled, advance },
       thirdPlace,
@@ -146,6 +183,16 @@ router.post('/:id/matches/:matchId/start', (req, res) => {
   const p1 = t.players.find((p) => p.id === match.p1);
   const p2 = t.players.find((p) => p.id === match.p2);
   const fmt = (t.formats && t.formats[bracket.phaseKey(t, match)]) || t.format;
+  // Team-Match: Teams als Scoring-Einheiten (id = Turnier-Einheit, damit Sync greift).
+  const teamCfg = (u) => ({
+    id: u.id,
+    name: u.name,
+    color: u.color || null,
+    checkoutMode: u.checkoutMode || 'double',
+    members: (u.members || []).map((m) => ({ id: m.dbId ?? m.id, dbId: m.dbId ?? null, name: m.name, dartId: m.dartId, checkoutMode: m.checkoutMode })),
+  });
+  const unitCfg =
+    p1.type === 'team' || p2.type === 'team' ? { teams: [teamCfg(p1), teamCfg(p2)] } : { players: [p1, p2] };
   const game = engine.createGame({
     mode: t.mode,
     checkIn: t.checkIn,
@@ -154,7 +201,8 @@ router.post('/:id/matches/:matchId/start', (req, res) => {
     sets: fmt.sets,
     legs: fmt.legs,
     maxRounds: t.maxRounds || 0,
-    players: [p1, p2],
+    bullOffRandomField: Boolean(t.bullOffRandomField),
+    ...unitCfg,
     randomOrder: true,
     tournamentId: t.id,
     meta: { tournamentName: t.name, matchId: match.id },

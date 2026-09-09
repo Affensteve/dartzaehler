@@ -14,6 +14,16 @@ router.get('/', (req, res) => {
   res.json(statsStore.list(parseRange(req.query.range), { training: isTraining(req.query.area) }));
 });
 
+// GET /api/stats/dart-recommendations – bester Pfeil je Spieler (nach Average)
+router.get('/dart-recommendations', (req, res) => {
+  res.json(statsStore.dartRecommendations());
+});
+
+// GET /api/stats/dart/:dartId/players – Spieler, die diesen Pfeil gespielt haben (+ Average)
+router.get('/dart/:dartId/players', (req, res) => {
+  res.json(statsStore.playersForDart(req.params.dartId));
+});
+
 // GET /api/stats/:playerId/darts?area= – vom Spieler benutzte Pfeile (für den Filter)
 router.get('/:playerId/darts', (req, res) => {
   res.json(statsStore.playerDarts(req.params.playerId, { training: isTraining(req.query.area) }));

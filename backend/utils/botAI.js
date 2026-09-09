@@ -107,6 +107,9 @@ function profileForAverage(avg) {
   };
 }
 
+// Fester „Anfänger+“-Bot mit Ziel-Ø ~40 (zwischen Easy und Medium).
+PROFILES.easyplus = profileForAverage(40);
+
 function parseLabel(label) {
   if (label === 'Bull') return D(25, 2);
   if (label === '25') return D(25, 1);

@@ -20,6 +20,7 @@ import Header from '../components/Header';
 import { StatSections } from '../components/statsView';
 import TrainingStatsView from '../components/training/TrainingStatsView';
 import TimelineChart from '../components/TimelineChart';
+import DartboardHeatmap from '../components/DartboardHeatmap';
 import { api } from '../api/client';
 import { ACCENT } from '../theme';
 import { useT, useLang } from '../i18n';
@@ -86,6 +87,8 @@ export default function PlayerStatsPage() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [achievements, setAchievements] = useState({ earned: [], progress: [] });
+  const [rating, setRating] = useState(null);
+  const [sectorHeat, setSectorHeat] = useState(null);
 
   // Benutzte Pfeile für die Filter-Chips (je Bereich); Filter zurücksetzen bei Wechsel.
   useEffect(() => {
@@ -120,6 +123,33 @@ export default function PlayerStatsPage() {
       .catch(() => setAchievements({ earned: [], progress: [] }));
   }, [id]);
 
+  useEffect(() => {
+    api.getPlayerRating(id).then(setRating).catch(() => setRating(null));
+  }, [id]);
+
+  // Treffer-Heatmap (nur Spiel/Turnier): Sektor-Treffer je Zahl aggregieren.
+  useEffect(() => {
+    if (area !== 'game') { setSectorHeat(null); return; }
+    const dartId = dartFilter === 'all' ? null : dartFilter;
+    api
+      .playerSectors(id, 'game', range)
+      .then((list) => {
+        const rows = dartId != null ? list.filter((d) => d.dartId === dartId) : list;
+        const values = {};
+        let bull = 0;
+        for (const d of rows)
+          for (const [k, c] of Object.entries(d.sectors || {})) {
+            if (k === '0') continue;
+            const num = k[0] === 'D' || k[0] === 'T' ? parseInt(k.slice(1), 10) : parseInt(k, 10);
+            if (num === 25) bull += c;
+            else if (num >= 1 && num <= 20) values[num] = (values[num] || 0) + c;
+          }
+        const total = bull + Object.values(values).reduce((a, b) => a + b, 0);
+        setSectorHeat({ values, bull, total });
+      })
+      .catch(() => setSectorHeat(null));
+  }, [id, area, range, dartFilter]);
+
   const dartChips = darts.filter((d) => d.dartId != null);
 
   return (
@@ -153,12 +183,21 @@ export default function PlayerStatsPage() {
               startIcon={<PictureAsPdfIcon />}
               onClick={async () => {
                 const { exportPlayerReport } = await import('../statsReport');
+                const [sectorsByDart, dbl, checkoutTable] = await Promise.all([
+                  api.playerSectors(id, area, range).catch(() => []),
+                  api.getPlayerDoubles(id).catch(() => ({ list: [] })),
+                  api.getCheckoutTable(id).catch(() => null),
+                ]);
                 exportPlayerReport({
                   player: row.name,
                   stats: row,
                   timeline,
                   rangeLabel: (RANGES.find((r) => r.key === range) || {}).label || '',
                   t,
+                  lang,
+                  sectorsByDart,
+                  doubles: (dbl && dbl.list) || [],
+                  checkoutTable,
                 });
               }}
             >
@@ -214,6 +253,16 @@ export default function PlayerStatsPage() {
               <TimelineChart data={timeline} />
             </Box>
 
+            {rating && rating.games > 0 && (
+              <Box sx={{ mb: 2, textAlign: 'center' }}>
+                <Chip
+                  color="primary"
+                  sx={{ fontWeight: 700 }}
+                  label={`${t('stats.elo')}: ${rating.elo} · ${rating.wins}–${rating.losses} · Peak ${rating.peak}`}
+                />
+              </Box>
+            )}
+
             {achievements.earned.length > 0 && (
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" align="center" sx={{ fontWeight: 800, mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
@@ -228,6 +277,7 @@ export default function PlayerStatsPage() {
                       <Box component="span" sx={{ fontSize: 22, lineHeight: 1 }}>{a.icon}</Box>
                       <Typography sx={{ fontWeight: 700, flex: 1, minWidth: 0 }} noWrap>
                         {lang === 'de' ? a.name : a.nameEn}
+                        {a.field ? ` (${a.field === 25 ? 'Bull' : a.field})` : ''}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                         {fmtDateTime(a.earnedAt)}
@@ -291,6 +341,16 @@ export default function PlayerStatsPage() {
                 ) : null}
                 <StatSections rows={[row]} showRank={false} area={area} range={range} externalDart={dartFilter} />
                 <CoRanges cr={row.checkoutRanges} t={t} />
+                {sectorHeat && sectorHeat.total > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="h6" align="center" sx={{ fontWeight: 800, mb: 1 }}>
+                      {t('stats.hitHeatmap')}
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                      <DartboardHeatmap values={sectorHeat.values} bull={sectorHeat.bull} base={ACCENT.green} size={260} />
+                    </Box>
+                  </Box>
+                )}
               </>
             )}
           </>

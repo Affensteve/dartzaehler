@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Container, Button, FormControlLabel, Checkbox, Divider, Alert, Tabs, Tab, Snackbar } from '@mui/material';
+import { Box, Container, Button, FormControlLabel, Checkbox, Divider, Alert, Tabs, Tab, Snackbar, TextField, MenuItem } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import Header from '../components/Header';
 import GameConfig from '../components/GameConfig';
@@ -13,6 +13,13 @@ export default function SetupPage() {
   const navigate = useNavigate();
   const t = useT();
   const [tab, setTab] = useState('single'); // 'single' | 'double'
+  const [leagues, setLeagues] = useState([]);
+  useEffect(() => {
+    api
+      .listLeagues()
+      .then((ls) => setLeagues((ls || []).filter((l) => l.status === 'active')))
+      .catch(() => {});
+  }, []);
   const [config, setConfig] = useState({
     mode: 501,
     checkIn: 'straight',
@@ -22,6 +29,7 @@ export default function SetupPage() {
     maxRounds: 20,
     inputMode: 'numpad',
     randomOrder: true,
+    bullOffRandomField: false,
   });
   const [players, setPlayers] = useState([makeHuman('')]);
   const [teams, setTeams] = useState([makeTeam(), makeTeam()]);
@@ -130,6 +138,23 @@ export default function SetupPage() {
           control={<Checkbox checked={config.randomOrder} onChange={(e) => setConfig((c) => ({ ...c, randomOrder: e.target.checked }))} />}
           label={t('setup.random')}
         />
+
+        {tab === 'single' && leagues.length > 0 && (
+          <TextField
+            select
+            fullWidth
+            size="small"
+            sx={{ mt: 2 }}
+            label={t('cfg.league')}
+            value={config.leagueId || ''}
+            onChange={(e) => setConfig((c) => ({ ...c, leagueId: e.target.value || null }))}
+          >
+            <MenuItem value="">{t('cfg.leagueNone')}</MenuItem>
+            {leagues.map((l) => (
+              <MenuItem key={l.id} value={l.id}>{l.name}</MenuItem>
+            ))}
+          </TextField>
+        )}
 
         <Divider sx={{ my: 2 }} />
 

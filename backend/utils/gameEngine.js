@@ -10,6 +10,7 @@ const rules = require('./dartRules');
 const botAI = require('./botAI');
 const playerStore = require('../models/playerStore');
 const doubleProfile = require('./doubleProfile');
+const tripleProfileUtil = require('./tripleProfile');
 const achievements = require('./achievements');
 const ACH_BY_ID = new Map(achievements.catalog().map((a) => [a.id, a]));
 
@@ -72,6 +73,9 @@ function createGame(config) {
     tournamentId = null,
     meta = {},
     maxRounds = 20,
+    bullOffRandomField = false,
+    leagueId = null,
+    partyMode = null,
   } = config;
 
   const startScore = rules.START_SCORES[mode] || 501;
@@ -104,6 +108,7 @@ function createGame(config) {
     turnStartScore: startScore,
     stats: emptyStats(),
     doubleProfile: null,
+    tripleProfile: null,
     voice: null,
   }));
 
@@ -122,6 +127,7 @@ function createGame(config) {
         if ((prof[dbPlayer.favoriteDouble] || 0) < 0.99) prof[dbPlayer.favoriteDouble] = 0.99;
       }
       p.doubleProfile = prof;
+      p.tripleProfile = dbPlayer.personalizeCheckout ? tripleProfileUtil.getPlayerTripleProfile(p.dbId) : null;
     }
   }
 
@@ -140,12 +146,15 @@ function createGame(config) {
         pointsScored: 0,
         voice: null,
         doubleProfile: null,
+        tripleProfile: null,
       }));
       // teamCheckout: 'double'|'single'|'master' (für alle gleich) oder 'individual' (je Spieler eigener Modus).
       const teamCheckout = ['single', 'master', 'individual'].includes(team.checkoutMode) ? team.checkoutMode : 'double';
       const cMode = teamCheckout === 'individual' ? (members[0] ? members[0].checkoutMode : 'double') : teamCheckout;
       return {
-        id: `t${ti}`,
+        // Turnier-Team-Matches geben die Turnier-Einheit-ID mit, damit die Ergebnis-
+        // Synchronisation (game.players.id === match.pX) auch für Teams greift.
+        id: team.id || `t${ti}`,
         dbId: null,
         name: team.name && team.name.trim() ? team.name.trim() : members.map((m) => m.name).join(' & '),
         type: 'team',
@@ -172,6 +181,7 @@ function createGame(config) {
         turnStartScore: startScore,
         stats: members[0] ? members[0].stats : emptyStats(),
         doubleProfile: null,
+        tripleProfile: null,
       };
     });
     for (const team of roster) {
@@ -188,9 +198,10 @@ function createGame(config) {
             if ((prof[dbPlayer.favoriteDouble] || 0) < 0.99) prof[dbPlayer.favoriteDouble] = 0.99;
           }
           m.doubleProfile = prof;
+          m.tripleProfile = dbPlayer.personalizeCheckout ? tripleProfileUtil.getPlayerTripleProfile(m.dbId) : null;
         }
       }
-      if (team.members[0]) team.doubleProfile = team.members[0].doubleProfile;
+      if (team.members[0]) { team.doubleProfile = team.members[0].doubleProfile; team.tripleProfile = team.members[0].tripleProfile; }
     }
   }
 
@@ -225,12 +236,16 @@ function createGame(config) {
     roundNumber: 1,
     turnsThisLeg: 0,
     awaitingBullOff: false,
+    bullOffRandomField: Boolean(bullOffRandomField),
+    bullOffTarget: null,
     status: 'playing',
     winnerId: null,
     message: null,
     messagePlayer: null,
     messageSeq: 0,
     tournamentId,
+    leagueId,
+    partyMode,
     meta,
     statsRecorded: false,
     undoStack: [],
@@ -271,6 +286,7 @@ function relinkTeam(p) {
     const m = p.members[p.memberIdx % p.members.length];
     p.stats = m.stats;
     p.doubleProfile = m.doubleProfile;
+  p.tripleProfile = m.tripleProfile;
     if (p.teamCheckout === 'individual') {
       p.checkoutMode = ['single', 'master'].includes(m.checkoutMode) ? m.checkoutMode : 'double';
     }
@@ -318,6 +334,7 @@ function detectShanghai(p) {
     const m = bySeg[seg];
     if (m.has(1) && m.has(2) && m.has(3)) {
       p.stats.shanghai = (p.stats.shanghai || 0) + 1;
+      p.stats.shanghaiField = Number(seg); // getroffenes Feld (für Badge-Detail)
       break;
     }
   }
@@ -395,7 +412,23 @@ function noteVisitQuirks(p) {
   }
   if (total === 26) st.bedBreakfast = 1; // „Bed & Breakfast" (Aufnahme = 26)
   if (total === 0 && darts.length >= 3) st.nuller = 1; // 3 Darts, kein Punkt
-  if (darts.length >= 3 && darts.every((d) => d.segment > 0 && d.segment === darts[0].segment)) st.threeInBed = 1;
+  if (darts.length >= 3 && darts.every((d) => d.segment > 0 && d.segment === darts[0].segment)) {
+    st.threeInBed = 1;
+    st.threeInBedField = darts[0].segment; // erreichtes Feld (für Badge-Detail)
+  }
+  // Aufnahme-Kombinationen: mehrere Triple-20 bzw. Bulls in einer Aufnahme.
+  const t20 = darts.filter((d) => d.segment === 20 && d.multiplier === 3).length;
+  if (t20 >= 2) st.twoT20 = 1;
+  const t19 = darts.filter((d) => d.segment === 19 && d.multiplier === 3).length;
+  if (t19 >= 2) st.twoT19 = 1;
+  const bulls = darts.filter((d) => d.segment === 25 && d.multiplier === 2).length; // Bullseye (50)
+  if (bulls >= 2) st.twoBull = 1;
+  if (bulls >= 3) st.threeBull = 1;
+  // Kuriose Aufnahme-Werte / -Muster.
+  if (total === 100) st.exactTon = 1;
+  if (total === 69) st.sixtyNine = 1;
+  if (darts.length >= 3 && darts.every((d) => d.multiplier === 2)) st.threeDoubles = 1;
+  if (darts.length >= 3 && darts.every((d) => d.multiplier === 3)) st.threeTriples = 1;
 }
 
 // Verbucht eine abgeschlossene Aufnahme (Visit) in die Spieler-Statistik.
@@ -407,6 +440,13 @@ function recordVisit(p, visitDarts) {
   else if (score >= 140) st.s140 += 1;
   else if (score >= 100) st.s100 += 1;
   else if (score >= 60) st.s60 += 1;
+  // Serie von 100+-Aufnahmen (für „Ton-Ton-Ton").
+  if (score >= 100) {
+    st.streak100 = (st.streak100 || 0) + 1;
+    if (st.streak100 >= 3) st.tonsInRow = 1;
+  } else {
+    st.streak100 = 0;
+  }
   if (score > st.maxTurn) st.maxTurn = score;
   if (p.visitsThisLeg <= 3) {
     st.first9Points += score;
@@ -443,6 +483,7 @@ function endTurn(game, { recordStats = true } = {}) {
     game.status === 'playing'
   ) {
     game.awaitingBullOff = true;
+    game.bullOffTarget = game.bullOffRandomField ? Math.floor(Math.random() * 20) + 1 : null;
     game.message = 'BULLOFF';
     game.messagePlayer = null;
     game.messageSeq = (game.messageSeq || 0) + 1;
@@ -481,6 +522,7 @@ function startNewLeg(game) {
   game.roundNumber = 1;
   game.turnsThisLeg = 0;
   game.awaitingBullOff = false;
+  game.bullOffTarget = null;
   updatePressureFlags(game);
 }
 
@@ -508,6 +550,12 @@ function handleLegWin(game, winner, { viaCheckout = true, recordStats = true } =
   if (winner.members && winner.members.length) winner.memberIdx = (winner.memberIdx + 1) % winner.members.length;
   winner.legsWon += 1;
   winner.legsWonTotal += 1;
+  // Größten überwundenen Leg-Rückstand je Einheit mitführen (für „Aufholjagd").
+  for (const u of game.players) {
+    const oppMax = Math.max(0, ...game.players.filter((x) => x !== u).map((x) => x.legsWonTotal || 0));
+    const def = oppMax - (u.legsWonTotal || 0);
+    if (u.stats && def > (u.stats.maxDeficit || 0)) u.stats.maxDeficit = def;
+  }
   game.message = viaCheckout ? 'CHECKOUT' : 'BULLOFF_WIN';
   game.messagePlayer = throwerName;
   game.messageSeq = (game.messageSeq || 0) + 1;
@@ -617,6 +665,7 @@ function applyDart(game, dart) {
     p.legPoints -= p.turnPoints;
     p.score = p.turnStartScore;
     p.turnPoints = 0;
+    p.stats.busts = (p.stats.busts || 0) + 1;
     game.message = 'BUST';
     game.messagePlayer = activeThrower(p).name;
     game.messageSeq = (game.messageSeq || 0) + 1;
@@ -636,6 +685,16 @@ function applyDart(game, dart) {
     if (rules.dartLabel(dart) === 'Bull') p.stats.bullCheckouts = (p.stats.bullCheckouts || 0) + 1;
     if (p.currentTurn.filter((d) => d.segment === 25).length >= 2) p.stats.bullBullFinish = 1;
     if (rules.dartLabel(dart) === 'D1') p.stats.madhouse = 1; // Finish auf Doppel 1
+    // Master-Out: Finish auf einem Doppel (inkl. Bull) zählt ebenfalls als Doppel-Treffer.
+    if (p.checkoutMode === 'master' && rules.isDoubleDart(dart)) {
+      p.stats.doubleAttempts += 1;
+      const lbl = rules.dartLabel(dart);
+      const ds = p.stats.doubleStats[lbl] || (p.stats.doubleStats[lbl] = { attempts: 0, hits: 0 });
+      ds.attempts += 1;
+      ds.hits += 1;
+    }
+    // Triple-Out (nur im Master-Out möglich): Finish auf einem Triple.
+    if (dart.multiplier === 3) p.stats.tripleCheckouts = (p.stats.tripleCheckouts || 0) + 1;
     detectShanghai(p);
     logVisit(game, p, p.currentTurn, p.turnPoints, 0, 'checkout');
     handleLegWin(game, p, { viaCheckout: true });
@@ -703,6 +762,7 @@ function applyVisitSum(game, sum, checkoutDarts) {
     p.legDarts += 3;
     p.score = scoreBefore;
     p.turnPoints = 0;
+    p.stats.busts = (p.stats.busts || 0) + 1;
     game.message = 'BUST';
     game.messagePlayer = activeThrower(p).name;
     game.messageSeq = (game.messageSeq || 0) + 1;
@@ -806,6 +866,24 @@ function matchAverage(p) {
  * meisten Legs gewonnen hat (bei Gleichstand der höhere Ø). Danach wird das
  * Ergebnis wie ein normal beendetes Spiel in die Statistik übernommen.
  */
+function surrender(game, unitId) {
+  if (game.status !== 'playing') return game;
+  const byUnit = game.players.find((p) => String(p.id) === String(unitId));
+  if (!byUnit) return game;
+  const others = game.players.filter((p) => p !== byUnit);
+  let winner = null;
+  for (const p of others) if (!winner || p.score < winner.score) winner = p;
+  const byIds = byUnit.members ? byUnit.members.map((m) => m.dbId).filter((x) => x != null) : byUnit.dbId != null ? [byUnit.dbId] : [];
+  const oppMinRest = others.length ? Math.min(...others.map((p) => p.score)) : Infinity;
+  game.surrenderInfo = { by: byIds, unitId: byUnit.id, round: game.roundNumber || 1, myRest: byUnit.score, oppMinRest };
+  game.awaitingBullOff = false;
+  game.status = 'finished';
+  game.winnerId = winner ? winner.id : null;
+  game.message = null;
+  game.messagePlayer = null;
+  return game;
+}
+
 function endUnlimited(game) {
   if (game.status !== 'playing' || game.format.satzLegMode !== 'unlimited') return game;
   pushUndo(game);
@@ -874,7 +952,7 @@ function toClient(game) {
   const checkout =
     current && game.status === 'playing' && !game.awaitingBullOff
       ? current.doubleProfile
-        ? rules.findPersonalizedCheckout(current.score, current.checkoutMode, current.doubleProfile, dartsRemaining)
+        ? rules.findPersonalizedCheckout(current.score, current.checkoutMode, current.doubleProfile, dartsRemaining, current.tripleProfile)
         : (() => {
             const route = rules.findCheckout(current.score, current.checkoutMode, dartsRemaining);
             return route ? { route, personalized: false } : null;
@@ -927,6 +1005,7 @@ function toClient(game) {
     setNumber: game.setNumber,
     roundNumber: game.roundNumber,
     awaitingBullOff: game.awaitingBullOff,
+    bullOffTarget: game.bullOffTarget || null,
     status: game.status,
     winnerId: game.winnerId,
     message: game.message,
@@ -941,11 +1020,12 @@ function toClient(game) {
       .map(([dbId, ids]) => {
         let pl = game.players.find((p) => String(p.dbId) === String(dbId));
         let playerName = pl ? pl.name : '';
+        let statsObj = pl ? pl.stats : null;
         if (!pl) {
           for (const tp of game.players) {
             if (!tp.members) continue;
             const mm = tp.members.find((x) => String(x.dbId) === String(dbId));
-            if (mm) { playerName = mm.name; break; }
+            if (mm) { playerName = mm.name; statsObj = mm.stats; break; }
           }
         }
         return {
@@ -953,7 +1033,21 @@ function toClient(game) {
           playerName,
           items: (ids || []).map((aid) => {
             const a = ACH_BY_ID.get(aid);
-            return { id: aid, name: a ? a.name : aid, nameEn: a ? a.nameEn : aid, icon: a ? a.icon : '🎯' };
+            const item = {
+              id: aid,
+              name: a ? a.name : aid,
+              nameEn: a ? a.nameEn : aid,
+              desc: a ? a.desc : '',
+              descEn: a ? a.descEn : '',
+              icon: a ? a.icon : '🎯',
+            };
+            if (aid === 'three-in-bed' && statsObj && statsObj.threeInBedField) {
+              item.field = statsObj.threeInBedField;
+            }
+            if (aid === 'shanghai-live' && statsObj && statsObj.shanghaiField) {
+              item.field = statsObj.shanghaiField;
+            }
+            return item;
           }),
         };
       })
@@ -967,6 +1061,7 @@ module.exports = {
   applyDart,
   applyVisitSum,
   endUnlimited,
+  surrender,
   undo,
   resolveBullOff,
   playBotTurn,

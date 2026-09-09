@@ -20,6 +20,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/DeleteOutline';
 import AddIcon from '@mui/icons-material/Add';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import PersonIcon from '@mui/icons-material/PersonOutline';
 import Header from '../components/Header';
 import { api } from '../api/client';
 import { ACCENT } from '../theme';
@@ -29,14 +30,28 @@ export default function DartsPage({ embedded = false }) {
   const navigate = useNavigate();
   const t = useT();
   const [darts, setDarts] = useState([]);
+  const [dartStats, setDartStats] = useState({}); // dartId -> [{name, average, games}]
   const [error, setError] = useState(null);
+
+  // Für jeden Pfeil: welche Spieler ihn gespielt haben (mit Average).
+  useEffect(() => {
+    let alive = true;
+    Promise.all((darts || []).map((d) => api.dartPlayers(d.id).then((r) => [d.id, r]).catch(() => [d.id, []]))).then(
+      (pairs) => alive && setDartStats(Object.fromEntries(pairs))
+    );
+    return () => {
+      alive = false;
+    };
+  }, [darts]);
 
   const [newName, setNewName] = useState('');
   const [newWeight, setNewWeight] = useState(20);
+  const [newOwner, setNewOwner] = useState('');
 
   const [editId, setEditId] = useState(null);
   const [draftName, setDraftName] = useState('');
   const [draftWeight, setDraftWeight] = useState(20);
+  const [draftOwner, setDraftOwner] = useState('');
 
   const reload = useCallback(() => {
     api.listDarts().then(setDarts).catch((e) => setError(e.message));
@@ -50,9 +65,10 @@ export default function DartsPage({ embedded = false }) {
     const name = newName.trim();
     if (!name) return;
     try {
-      await api.createDart({ name, weightGrams: Number(newWeight) || 20 });
+      await api.createDart({ name, weightGrams: Number(newWeight) || 20, owner: newOwner.trim() });
       setNewName('');
       setNewWeight(20);
+      setNewOwner('');
       reload();
     } catch (e) {
       setError(e.message);
@@ -63,13 +79,14 @@ export default function DartsPage({ embedded = false }) {
     setEditId(d.id);
     setDraftName(d.name);
     setDraftWeight(d.weightGrams);
+    setDraftOwner(d.owner || '');
   };
 
   const save = async (id) => {
     const name = draftName.trim();
     if (!name) return;
     try {
-      await api.updateDart(id, { name, weightGrams: Number(draftWeight) || 20 });
+      await api.updateDart(id, { name, weightGrams: Number(draftWeight) || 20, owner: draftOwner.trim() });
       setEditId(null);
       reload();
     } catch (e) {
@@ -114,6 +131,15 @@ export default function DartsPage({ embedded = false }) {
               value={newWeight}
               onChange={(e) => setNewWeight(e.target.value)}
               sx={{ width: 110 }}
+            />
+            <TextField
+              variant="standard"
+              label={t('darts.owner')}
+              placeholder={t('darts.ownerPh')}
+              value={newOwner}
+              onChange={(e) => setNewOwner(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && add()}
+              sx={{ minWidth: 160 }}
             />
             <Button variant="contained" startIcon={<AddIcon />} onClick={add} disabled={!newName.trim()}>
               {t('common.add')}
@@ -175,11 +201,45 @@ export default function DartsPage({ embedded = false }) {
                             onChange={(e) => setDraftWeight(e.target.value)}
                             sx={{ width: 110 }}
                           />
+                          <TextField
+                            variant="standard"
+                            label={t('darts.owner')}
+                            value={draftOwner}
+                            onChange={(e) => setDraftOwner(e.target.value)}
+                            sx={{ minWidth: 140 }}
+                          />
                         </Stack>
                       ) : (
                         <>
                           <Typography sx={{ fontWeight: 700, fontSize: 18 }}>{d.name}</Typography>
-                          <Chip size="small" variant="outlined" label={`${d.weightGrams} g`} sx={{ mt: 0.25, height: 20, fontSize: 11 }} />
+                          <Stack direction="row" spacing={0.75} sx={{ mt: 0.25, flexWrap: 'wrap' }} useFlexGap>
+                            <Chip size="small" variant="outlined" label={`${d.weightGrams} g`} sx={{ height: 20, fontSize: 11 }} />
+                            {d.owner ? (
+                              <Chip
+                                size="small"
+                                variant="outlined"
+                                icon={<PersonIcon sx={{ fontSize: 14 }} />}
+                                label={d.owner}
+                                sx={{ height: 20, fontSize: 11 }}
+                              />
+                            ) : null}
+                          </Stack>
+                          {dartStats[d.id] && dartStats[d.id].length > 0 && (
+                            <Box sx={{ mt: 0.5 }}>
+                              <Typography variant="caption" color="text.secondary">{t('darts.playedBy')}:</Typography>
+                              <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, flexWrap: 'wrap' }} useFlexGap>
+                                {dartStats[d.id].map((pl) => (
+                                  <Chip
+                                    key={pl.playerId}
+                                    size="small"
+                                    variant="outlined"
+                                    label={`${pl.name} · Ø ${pl.average}`}
+                                    sx={{ height: 20, fontSize: 11 }}
+                                  />
+                                ))}
+                              </Stack>
+                            </Box>
+                          )}
                         </>
                       )}
                     </Box>
@@ -203,7 +263,7 @@ export default function DartsPage({ embedded = false }) {
   }
   return (
     <Box>
-      <Header title={t('darts.title')} onBack={() => navigate('/')} />
+      <Header title={t('darts.title')} onBack={() => navigate('/verwaltung')} />
       <Container maxWidth="sm" sx={{ py: 3 }}>
         {inner}
       </Container>

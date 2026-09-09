@@ -88,6 +88,23 @@ export default function useGame(id) {
     [id, applyGame]
   );
 
+  // Gebündelte Aufnahme (mehrere Darts auf einmal) – ein Request statt drei.
+  const throwTurn = useCallback(
+    async (darts) => {
+      if (busy.current || !Array.isArray(darts) || !darts.length) return;
+      busy.current = true;
+      try {
+        const g = await api.throwTurn(id, darts);
+        applyGame(g);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        busy.current = false;
+      }
+    },
+    [id, applyGame]
+  );
+
   // Mehrere Fehlwürfe (0) in Folge senden – für die "Double/Triple 0"-Kurzeingabe.
   // Sequenziell und unter einer Sperre, damit die Würfe nicht durcheinandergeraten.
   const throwMisses = useCallback(
@@ -156,6 +173,22 @@ export default function useGame(id) {
     }
   }, [id, applyGame]);
 
+  const surrender = useCallback(
+    async (unitId) => {
+      if (busy.current) return;
+      busy.current = true;
+      try {
+        const g = await api.surrender(id, unitId);
+        applyGame(g);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        busy.current = false;
+      }
+    },
+    [id, applyGame]
+  );
+
   const bullOff = useCallback(
     async (winnerId) => {
       if (busy.current) return;
@@ -172,5 +205,5 @@ export default function useGame(id) {
     [id, applyGame]
   );
 
-  return { game, error, loading, throwDart, throwMisses, submitVisit, undo, bullOff, finishGame, reload };
+  return { game, error, loading, throwDart, throwTurn, throwMisses, submitVisit, undo, surrender, bullOff, finishGame, reload };
 }

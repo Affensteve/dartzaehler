@@ -11,8 +11,8 @@ function q(sql) {
 }
 
 const insertHead = db.prepare(`
-  INSERT INTO match_history (id, is_training, tournament_id, mode, format_label, input_mode, winner_name, players, format, checkout)
-  VALUES (@id, @isTraining, @tournamentId, @mode, @formatLabel, @inputMode, @winnerName, @players, @format, @checkout)
+  INSERT INTO match_history (id, is_training, tournament_id, league_id, mode, format_label, input_mode, winner_name, players, format, checkout)
+  VALUES (@id, @isTraining, @tournamentId, @leagueId, @mode, @formatLabel, @inputMode, @winnerName, @players, @format, @checkout)
 `);
 const insertVisit = db.prepare(`
   INSERT INTO match_visits (match_id, seq, player_id, player_name, set_no, leg_no, round_no, darts, score, remaining, kind)
@@ -47,6 +47,7 @@ const recordMatch = db.transaction((game) => {
     id: game.id,
     isTraining: game.training ? 1 : 0,
     tournamentId: game.tournamentId || null,
+    leagueId: game.leagueId || null,
     mode: game.mode || 501,
     formatLabel: game.format ? game.format.label : null,
     inputMode: game.inputMode || 'numpad',
@@ -194,4 +195,31 @@ function headToHead(aId, bId) {
   return { matches, a: out(ra), b: out(rb) };
 }
 
-module.exports = { recordMatch, list, get, remove, headToHead };
+// Ermittelt rückwirkend das Feld, auf dem ein Spieler ein Shanghai (Single+Double+Triple
+// derselben Zahl in einer Aufnahme) geworfen hat – für die Anzeige „Shanghai (5)" bei
+// bereits erspielten Abzeichen. Liefert das früheste gefundene Feld (1–20) oder null.
+const visitDartsForPlayer = db.prepare('SELECT darts FROM match_visits WHERE player_id = ? ORDER BY id ASC');
+function shanghaiFieldForPlayer(dbId) {
+  if (!Number.isInteger(dbId)) return null;
+  for (const row of visitDartsForPlayer.all(dbId)) {
+    let darts;
+    try {
+      darts = JSON.parse(row.darts || '[]');
+    } catch (e) {
+      continue;
+    }
+    const bySeg = {};
+    for (const d of darts) {
+      if (d && d.segment >= 1 && d.segment <= 20) {
+        (bySeg[d.segment] = bySeg[d.segment] || new Set()).add(d.multiplier);
+      }
+    }
+    for (const seg in bySeg) {
+      const m = bySeg[seg];
+      if (m.has(1) && m.has(2) && m.has(3)) return Number(seg);
+    }
+  }
+  return null;
+}
+
+module.exports = { recordMatch, list, get, remove, headToHead, shanghaiFieldForPlayer };

@@ -196,6 +196,28 @@ router.post('/:id/throw', (req, res) => {
   }
 });
 
+// POST /api/games/:id/turn – gebündelte Aufnahme (mehrere Einzel-Darts auf einmal).
+// Wendet die Darts nacheinander an; bei Bust/Checkout/Zugwechsel wird gestoppt.
+router.post('/:id/turn', (req, res) => {
+  const game = loadOr404(req, res);
+  if (!game) return;
+  try {
+    const darts = Array.isArray(req.body?.darts) ? req.body.darts.slice(0, 3) : [];
+    for (const d of darts) {
+      if (game.status !== 'playing' || game.awaitingBullOff) break;
+      const before = game.currentPlayerIndex;
+      engine.applyDart(game, { segment: Number(d.segment), multiplier: Number(d.multiplier) });
+      if (game.message === 'BUST' || game.message === 'CHECKOUT' || game.currentPlayerIndex !== before) break;
+    }
+    persist(game);
+    emit(game);
+    res.json(view(game));
+    driveBots(game.id);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // POST /api/games/:id/visit – ganze Aufnahme als Summe (Freitext-Modus)
 router.post('/:id/visit', (req, res) => {
   const game = loadOr404(req, res);
@@ -221,6 +243,20 @@ router.post('/:id/finish', (req, res) => {
   if (!game) return;
   try {
     engine.endUnlimited(game);
+    persist(game);
+    emit(game);
+    res.json(view(game));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/games/:id/surrender – ein Spieler/Team gibt auf; Spiel wird gewertet beendet.
+router.post('/:id/surrender', (req, res) => {
+  const game = loadOr404(req, res);
+  if (!game) return;
+  try {
+    engine.surrender(game, req.body?.unitId);
     persist(game);
     emit(game);
     res.json(view(game));

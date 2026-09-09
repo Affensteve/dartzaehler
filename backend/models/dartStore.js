@@ -2,16 +2,16 @@
 
 const db = require('../db/init');
 
-const insertStmt = db.prepare('INSERT INTO darts (name, weight_grams) VALUES (?, ?)');
+const insertStmt = db.prepare('INSERT INTO darts (name, weight_grams, owner) VALUES (?, ?, ?)');
 const listStmt = db.prepare('SELECT * FROM darts ORDER BY weight_grams, name COLLATE NOCASE');
 const getStmt = db.prepare('SELECT * FROM darts WHERE id = ?');
-const updateStmt = db.prepare('UPDATE darts SET name = ?, weight_grams = ? WHERE id = ?');
+const updateStmt = db.prepare('UPDATE darts SET name = ?, weight_grams = ?, owner = ? WHERE id = ?');
 const deleteStmt = db.prepare('DELETE FROM darts WHERE id = ?');
 const countStmt = db.prepare('SELECT COUNT(*) AS c FROM darts');
 
 function rowToDart(row) {
   if (!row) return null;
-  return { id: row.id, name: row.name, weightGrams: row.weight_grams, createdAt: row.created_at };
+  return { id: row.id, name: row.name, weightGrams: row.weight_grams, owner: row.owner || '', createdAt: row.created_at };
 }
 
 function clampWeight(g) {
@@ -20,17 +20,22 @@ function clampWeight(g) {
   return Math.min(Math.max(n, 5), 60); // sinnvolle Grenzen in Gramm
 }
 
-function create({ name, weightGrams = 20 }) {
-  const info = insertStmt.run(String(name).trim().slice(0, 40), clampWeight(weightGrams));
+function cleanOwner(o) {
+  return o == null ? null : String(o).trim().slice(0, 40) || null;
+}
+
+function create({ name, weightGrams = 20, owner = null }) {
+  const info = insertStmt.run(String(name).trim().slice(0, 40), clampWeight(weightGrams), cleanOwner(owner));
   return rowToDart(getStmt.get(info.lastInsertRowid));
 }
 
-function update(id, { name, weightGrams }) {
+function update(id, { name, weightGrams, owner }) {
   const cur = getStmt.get(id);
   if (!cur) return null;
   const newName = name != null ? String(name).trim().slice(0, 40) : cur.name;
   const newW = weightGrams != null ? clampWeight(weightGrams) : cur.weight_grams;
-  updateStmt.run(newName, newW, id);
+  const newOwner = owner !== undefined ? cleanOwner(owner) : cur.owner;
+  updateStmt.run(newName, newW, newOwner, id);
   return rowToDart(getStmt.get(id));
 }
 

@@ -7,6 +7,8 @@ import {
   IconButton,
   Stack,
   Tooltip,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
@@ -150,7 +152,23 @@ export default function GameConfig({ config, setConfig, allowUnlimited = true })
 
         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
           <Tile label={t('cfg.ausbullen')} info={t('cfg.roundsInfo')}>
-            <Stepper value={config.maxRounds} onChange={(v) => set({ maxRounds: v })} min={0} max={60} />
+            <Stack spacing={0.5} alignItems="center">
+              <Stepper value={config.maxRounds} onChange={(v) => set({ maxRounds: v })} min={0} max={60} />
+              <Tooltip title={t('cfg.randomFieldInfo')} enterTouchDelay={0} leaveTouchDelay={6000} arrow>
+                <FormControlLabel
+                  sx={{ m: 0 }}
+                  control={
+                    <Switch
+                      size="small"
+                      checked={Boolean(config.bullOffRandomField)}
+                      disabled={!config.maxRounds}
+                      onChange={(e) => set({ bullOffRandomField: e.target.checked })}
+                    />
+                  }
+                  label={<Typography variant="caption" sx={{ fontWeight: 700 }}>{t('cfg.randomField')}</Typography>}
+                />
+              </Tooltip>
+            </Stack>
           </Tile>
           <Tile label={t('cfg.inputVariant')} info={t('cfg.inputInfo')}>
             <ToggleButtonGroup

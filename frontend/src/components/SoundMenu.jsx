@@ -14,7 +14,7 @@ import {
   Tooltip,
 } from '@mui/material';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
-import VolumeOffIcon from '@mui/icons-material/VolumeOff';
+import SettingsIcon from '@mui/icons-material/Settings';
 import {
   getSoundSettings,
   setSoundSettings,
@@ -55,16 +55,16 @@ export default function SoundMenu() {
 
   return (
     <>
-      <Tooltip title="Ton-Einstellungen">
+      <Tooltip title={s.lang === 'en' ? 'Settings' : 'Einstellungen'}>
         <IconButton
           color="inherit"
           onClick={(e) => {
             setVoiceList(listVoices(s.lang));
             setAnchor(e.currentTarget);
           }}
-          aria-label="Ton-Einstellungen"
+          aria-label={s.lang === 'en' ? 'Settings' : 'Einstellungen'}
         >
-          {s.enabled ? <VolumeUpIcon /> : <VolumeOffIcon />}
+          <SettingsIcon />
         </IconButton>
       </Tooltip>
       <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
@@ -96,6 +96,40 @@ export default function SoundMenu() {
               onChange={(e) => setSoundSettings({ commentary: e.target.checked })}
             />
           </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+            <Typography variant="body2">Rest-Ansage (Checkout)</Typography>
+            <Switch
+              size="small"
+              checked={s.checkoutCall}
+              disabled={!s.enabled || !s.voice}
+              onChange={(e) => setSoundSettings({ checkoutCall: e.target.checked })}
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+            <Typography variant="body2">Scoring gebündelt senden</Typography>
+            <Switch
+              size="small"
+              checked={s.batchScoring}
+              onChange={(e) => setSoundSettings({ batchScoring: e.target.checked })}
+            />
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            Aufnahme lokal eingeben, gesammelt senden (im Checkout weiterhin sofort).
+          </Typography>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+            <Typography variant="body2">Spielerbilder in Spielansicht</Typography>
+            <Switch
+              size="small"
+              checked={s.avatarsInGame}
+              onChange={(e) => setSoundSettings({ avatarsInGame: e.target.checked })}
+            />
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            Standardmäßig nur in der Cast-Anzeige.
+          </Typography>
 
           <Typography variant="body2" sx={{ mt: 1, mb: 0.5 }}>
             Sprache

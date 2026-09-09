@@ -5,6 +5,7 @@ import {
   Container,
   Typography,
   Button,
+  ButtonBase,
   Stack,
   Paper,
   List,
@@ -29,6 +30,9 @@ import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import HistoryIcon from '@mui/icons-material/History';
 import CastIcon from '@mui/icons-material/Cast';
+import LeaderboardIcon from '@mui/icons-material/Leaderboard';
+import InsightsIcon from '@mui/icons-material/Insights';
+import CelebrationIcon from '@mui/icons-material/Celebration';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import Header from '../components/Header';
 import { api } from '../api/client';
@@ -69,12 +73,15 @@ export default function HomePage() {
   const gameTitle = (g) =>
     g.players && g.players.length ? `${t('home.game')} ${g.players.join(' : ')}` : `${t('home.game')} ${g.id.slice(0, 8)}`;
 
+  const primary = { icon: <SportsIcon />, label: t('home.newGame'), to: '/setup', color: '#006EC7' };
   const NAV = [
-    { icon: <SportsIcon />, label: t('home.newGame'), to: '/setup', variant: 'contained' },
-    { icon: <EmojiEventsIcon />, label: t('home.newTournament'), to: '/tournament/new' },
-    { icon: <FitnessCenterIcon />, label: t('home.training'), to: '/training' },
-    { icon: <ManageAccountsIcon />, label: t('home.management'), to: '/verwaltung' },
-    { icon: <CastIcon />, label: t('home.cast'), to: '/cast' },
+    { icon: <CelebrationIcon />, label: t('home.party'), to: '/party', color: '#EC407A' },
+    { icon: <EmojiEventsIcon />, label: t('home.newTournament'), to: '/tournament/new', color: '#E0A400' },
+    { icon: <FitnessCenterIcon />, label: t('home.training'), to: '/training', color: '#2E9E5B' },
+    { icon: <InsightsIcon />, label: t('home.auswertung'), to: '/auswertung', color: '#7A5CC7' },
+    { icon: <LeaderboardIcon />, label: t('home.leagues'), to: '/leagues', color: '#00A3A3' },
+    { icon: <ManageAccountsIcon />, label: t('home.management'), to: '/verwaltung', color: '#455A64' },
+    { icon: <CastIcon />, label: t('home.cast'), to: '/cast', color: '#5C6BC0' },
   ];
 
   return (
@@ -82,18 +89,48 @@ export default function HomePage() {
       <Header title={t('app.title')} back={false} />
       <Container maxWidth="sm" sx={{ py: 3 }}>
         <Stack spacing={2}>
-          {NAV.map((b) => (
-            <Button
-              key={b.to}
-              size="large"
-              variant={b.variant || 'outlined'}
-              startIcon={b.icon}
-              sx={{ py: 2, fontSize: 18 }}
-              onClick={() => navigate(b.to)}
-            >
-              {b.label}
-            </Button>
-          ))}
+          <ButtonBase
+            onClick={() => navigate(primary.to)}
+            aria-label={primary.label}
+            sx={{ display: 'block', borderRadius: 1 }}
+          >
+            <Paper sx={{ p: 2.5, clipPath: CARD_CUT, bgcolor: primary.color, color: '#fff', display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ width: 48, height: 48, borderRadius: '50%', display: 'grid', placeItems: 'center', bgcolor: 'rgba(255,255,255,0.2)' }}>
+                {primary.icon}
+              </Box>
+              <Typography sx={{ fontWeight: 800, fontSize: 22 }}>{primary.label}</Typography>
+            </Paper>
+          </ButtonBase>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+            {NAV.map((b) => (
+              <ButtonBase
+                key={b.to}
+                onClick={() => navigate(b.to)}
+                aria-label={b.label}
+                sx={{ display: 'block', borderRadius: 1 }}
+              >
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    height: '100%',
+                    clipPath: CARD_CUT,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                    transition: 'border-color 120ms ease, transform 120ms ease',
+                    '&:hover': { borderColor: b.color, transform: 'translateY(-2px)' },
+                  }}
+                >
+                  <Box sx={{ width: 40, height: 40, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', bgcolor: b.color }}>
+                    {b.icon}
+                  </Box>
+                  <Typography sx={{ fontWeight: 700 }}>{b.label}</Typography>
+                </Paper>
+              </ButtonBase>
+            ))}
+          </Box>
 
           {openGames.length > 0 && (
             <Paper variant="outlined" sx={{ clipPath: CARD_CUT }}>
